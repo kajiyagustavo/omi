@@ -125,6 +125,21 @@ void main() {
       expect(r2[0].every((b) => b == 0x42), isTrue);
     });
 
+    test('reset() descarta bytes parciais e permite frame limpo na reconexão', () {
+      final asm = AirecFrameAssembler();
+      // Envia bytes parciais sem completar um frame (lixo de 12 bytes sem magic)
+      asm.addBytes([0x5b, 0x50, ...List.filled(10, 0xAB)]);
+      // Reseta — buffer sujo deve ser descartado
+      asm.reset();
+      // Frame válido completo: deve sair exatamente 1 pacote de 80 bytes
+      final frame = [0x5b, 0x50, ...List.filled(80, 0xCC)];
+      final packets = asm.addBytes(frame);
+      expect(packets.length, 1);
+      expect(packets[0].length, 80);
+      expect(packets[0].every((b) => b == 0xCC), isTrue,
+          reason: 'lixo parcial deve ter sido descartado pelo reset()');
+    });
+
     test('muitos chunks sem magic não estouram o buffer', () {
       final asm = AirecFrameAssembler();
       // 50 chamadas de 100 bytes sem magic nenhuma

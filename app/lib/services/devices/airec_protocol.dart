@@ -99,6 +99,12 @@ class AirecFrameAssembler {
     return packets;
   }
 
+  /// Descarta estado entre conexões — evita que buffer residual embaralhe o framing numa reconexão.
+  void reset() {
+    _buf.clear();
+    _aligned = false;
+  }
+
   static int _findMagic(List<int> buf) {
     for (int i = 0; i < buf.length - 1; i++) {
       if (buf[i] == AirecFraming.magic0 && buf[i + 1] == AirecFraming.magic1) {

@@ -20,6 +20,7 @@ class AirecDeviceConnection extends DeviceConnection {
     void Function(String deviceId, DeviceConnectionState state)? onConnectionStateChanged,
   }) async {
     await super.connect(onConnectionStateChanged: onConnectionStateChanged);
+    _assembler.reset();
     await Future.delayed(const Duration(seconds: 1));
 
     // Inscreve response char primeiro para capturar ACKs do handshake.
@@ -53,7 +54,9 @@ class AirecDeviceConnection extends DeviceConnection {
     }
     await _responseSub?.cancel();
     await _audioSub?.cancel();
-    await _audioStream.close();
+    if (!_audioStream.isClosed) {
+      await _audioStream.close();
+    }
     await super.disconnect();
   }
 
