@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:omi/backend/schema/bt_device/bt_device.dart';
+import 'package:omi/services/devices.dart';
 import 'package:omi/services/devices/device_connection.dart';
 import 'package:omi/services/devices/models.dart';
 import 'package:omi/services/devices/airec_protocol.dart';
