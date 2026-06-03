@@ -75,6 +75,66 @@ void main() {
       expect(packets[0].length, 80);
       expect(packets[0].every((b) => b == 0x33), isTrue);
     });
+
+    // Testes do bug de realinhamento (devem FALHAR antes da correção)
+    test('realinha após frame inválido no meio do stream', () {
+      // frameA válido + 10 bytes de lixo sem magic + frameB válido
+      // Com o bug atual, B se perde porque o assembler segue fatiando fora de fase.
+      final frameA = buildFrame(0xAA);
+      final lixo = List.filled(10, 0xFF); // sem magic [P
+      final frameB = buildFrame(0xBB);
+
+      final asm = AirecFrameAssembler();
+      final packets = asm.addBytes([...frameA, ...lixo, ...frameB]);
+
+      expect(packets.length, 2);
+      expect(packets[0].every((b) => b == 0xAA), isTrue,
+          reason: 'primeiro pacote deve ser frame A (filler 0xAA)');
+      expect(packets[1].every((b) => b == 0xBB), isTrue,
+          reason: 'segundo pacote deve ser frame B (filler 0xBB)');
+    });
+
+    test('realinha após lixo de tamanho não múltiplo de 82 entre frames', () {
+      // frameA + 5 bytes de lixo sem magic + frameC → 2 pacotes na ordem A, C
+      final frameA = buildFrame(0xCC);
+      final lixo = List.filled(5, 0x01); // 5 bytes, sem magic
+      final frameC = buildFrame(0xDD);
+
+      final asm = AirecFrameAssembler();
+      final packets = asm.addBytes([...frameA, ...lixo, ...frameC]);
+
+      expect(packets.length, 2);
+      expect(packets[0].every((b) => b == 0xCC), isTrue,
+          reason: 'primeiro pacote deve ser frame A (filler 0xCC)');
+      expect(packets[1].every((b) => b == 0xDD), isTrue,
+          reason: 'segundo pacote deve ser frame C (filler 0xDD)');
+    });
+
+    // Testes de hardening (comportamento já correto, só fixando em teste)
+    test('magic partida em dois chunks de 1 byte', () {
+      final asm = AirecFrameAssembler();
+      // Primeiro chunk: só o primeiro byte da magic
+      final r1 = asm.addBytes([0x5b]);
+      expect(r1, isEmpty);
+      // Segundo chunk: segundo byte da magic + 80 bytes de payload
+      final r2 = asm.addBytes([0x50, ...List.filled(80, 0x42)]);
+      expect(r2.length, 1);
+      expect(r2[0].length, 80);
+      expect(r2[0].every((b) => b == 0x42), isTrue);
+    });
+
+    test('muitos chunks sem magic não estouram o buffer', () {
+      final asm = AirecFrameAssembler();
+      // 50 chamadas de 100 bytes sem magic nenhuma
+      for (var i = 0; i < 50; i++) {
+        asm.addBytes(List.filled(100, 0x00));
+      }
+      // Agora entrega um frame válido — deve sair exatamente 1 pacote
+      final frame = buildFrame(0x77);
+      final packets = asm.addBytes(frame);
+      expect(packets.length, 1);
+      expect(packets[0].every((b) => b == 0x77), isTrue);
+    });
   });
 
   // ──────────────────────────────────────────────
@@ -110,6 +170,11 @@ void main() {
     test('parseResponse retorna null com menos de 2 bytes', () {
       expect(AirecProtocol.parseResponse([0xaa]), isNull);
       expect(AirecProtocol.parseResponse([]), isNull);
+    });
+
+    test('parseResponse com body vazio retorna lista vazia (ACK sem corpo)', () {
+      // body vazio é válido — representa um ACK sem dados adicionais
+      expect(AirecProtocol.parseResponse([0xaa, 0x55]), equals([]));
     });
 
     test('handshake tem exatamente 19 sequências', () {
