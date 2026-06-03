@@ -14,6 +14,7 @@ import 'package:omi/services/devices/limitless_connection.dart';
 import 'package:omi/services/devices/models.dart';
 import 'package:omi/services/devices/omi_connection.dart';
 import 'package:omi/services/devices/omiglass_connection.dart';
+import 'package:omi/services/devices/airec_connection.dart';
 import 'package:omi/services/devices/plaud_connection.dart';
 import 'package:omi/services/devices/transports/device_transport.dart';
 import 'package:omi/services/devices/transports/native_ble_transport.dart';
@@ -140,6 +141,8 @@ class DeviceConnectionFactory {
         return BeeDeviceConnection(device, transport);
       case DeviceType.plaud:
         return PlaudDeviceConnection(device, transport);
+      case DeviceType.airec:
+        return AirecDeviceConnection(device, transport);
       case DeviceType.frame:
         if (locator.kind == TransportKind.bluetooth) {
           final deviceId = locator.bluetoothId;

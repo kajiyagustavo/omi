@@ -1,0 +1,6 @@
+name: airec_core
+description: Lógica pura do protocolo AIREC (testável sem Flutter).
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+dev_dependencies:
+  test: ^1.24.0

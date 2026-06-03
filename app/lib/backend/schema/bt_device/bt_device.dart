@@ -14,6 +14,7 @@ import 'package:omi/services/devices/limitless_connection.dart';
 import 'package:omi/services/devices/models.dart';
 import 'package:omi/services/devices/omi_connection.dart';
 import 'package:omi/services/devices/omiglass_connection.dart';
+import 'package:omi/services/devices/airec_connection.dart';
 import 'package:omi/services/devices/plaud_connection.dart';
 import 'package:omi/utils/logger.dart';
 
@@ -200,6 +201,8 @@ Future<DeviceType?> getTypeOfBluetoothDevice(BluetoothDevice device) async {
     deviceType = DeviceType.bee;
   } else if (BtDevice.isPlaudDeviceFromDevice(device)) {
     deviceType = DeviceType.plaud;
+  } else if (BtDevice.isAirecDeviceFromDevice(device)) {
+    deviceType = DeviceType.airec;
   } else if (BtDevice.isFieldyDeviceFromDevice(device)) {
     deviceType = DeviceType.fieldy;
   } else if (BtDevice.isFriendPendantDeviceFromDevice(device)) {
@@ -225,7 +228,7 @@ Future<DeviceType?> getTypeOfBluetoothDevice(BluetoothDevice device) async {
   return deviceType;
 }
 
-enum DeviceType { omi, openglass, frame, appleWatch, plaud, bee, fieldy, friendPendant, limitless }
+enum DeviceType { omi, openglass, frame, appleWatch, plaud, bee, fieldy, friendPendant, limitless, airec }
 
 Map<String, DeviceType> cachedDevicesMap = {};
 
@@ -357,6 +360,8 @@ class BtDevice {
       return await _getDeviceInfoFromBee(conn);
     } else if (type == DeviceType.plaud) {
       return await _getDeviceInfoFromPlaud(conn as PlaudDeviceConnection);
+    } else if (type == DeviceType.airec) {
+      return await _getDeviceInfoFromAirec(conn as AirecDeviceConnection);
     } else if (type == DeviceType.fieldy) {
       return await _getDeviceInfoFromFieldy(conn);
     } else if (type == DeviceType.friendPendant) {
@@ -528,6 +533,17 @@ class BtDevice {
     );
   }
 
+  // Valores estáticos: AIREC não expõe serviço DIS via BLE.
+  Future _getDeviceInfoFromAirec(AirecDeviceConnection conn) async {
+    return copyWith(
+      modelNumber: 'AIREC',
+      firmwareRevision: '1.0.0',
+      hardwareRevision: '1.0.0',
+      manufacturerName: 'AIREC',
+      type: DeviceType.airec,
+    );
+  }
+
   Future _getDeviceInfoFromFieldy(DeviceConnection conn) async {
     var modelNumber = 'Fieldy';
     var firmwareRevision = '1.0.0';
@@ -642,6 +658,7 @@ class BtDevice {
       case DeviceType.openglass:
       case DeviceType.frame:
       case DeviceType.appleWatch:
+      case DeviceType.airec:
         return ''; // No warning needed
     }
   }
@@ -680,6 +697,7 @@ class BtDevice {
       case DeviceType.openglass:
       case DeviceType.frame:
       case DeviceType.appleWatch:
+      case DeviceType.airec:
         return ''; // No warning needed
     }
   }
@@ -694,6 +712,7 @@ class BtDevice {
   static bool isSupportedDevice(ScanResult result) {
     return isBeeDevice(result) ||
         isPlaudDevice(result) ||
+        isAirecDevice(result) ||
         isFieldyDevice(result) ||
         isFriendPendantDevice(result) ||
         isLimitlessDevice(result) ||
@@ -748,6 +767,17 @@ class BtDevice {
 
     // Fallback: name check for compatibility
     return device.platformName.toUpperCase().startsWith('PLAUD');
+  }
+
+  static bool isAirecDevice(ScanResult result) {
+    return result.device.platformName.toUpperCase().startsWith('AIREC');
+  }
+
+  static bool isAirecDeviceFromDevice(BluetoothDevice device) {
+    if (device.servicesList.any((s) => s.uuid == Guid(airecServiceUuid))) {
+      return true;
+    }
+    return device.platformName.toUpperCase().startsWith('AIREC');
   }
 
   static bool isFieldyDevice(ScanResult result) {
@@ -814,6 +844,8 @@ class BtDevice {
       deviceType = DeviceType.bee;
     } else if (isPlaudDevice(result)) {
       deviceType = DeviceType.plaud;
+    } else if (isAirecDevice(result)) {
+      deviceType = DeviceType.airec;
     } else if (isFieldyDevice(result)) {
       deviceType = DeviceType.fieldy;
     } else if (isFriendPendantDevice(result)) {

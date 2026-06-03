@@ -323,6 +323,8 @@ class CaptureProvider extends ChangeNotifier
         return 'apple_watch';
       case DeviceType.limitless:
         return 'limitless';
+      case DeviceType.airec:
+        return 'airec';
     }
   }
 
