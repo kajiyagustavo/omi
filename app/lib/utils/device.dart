@@ -103,6 +103,8 @@ class DeviceUtils {
           }
           // Default omi image
           return Assets.images.omiWithoutRope.path;
+        case DeviceType.airec:
+          return Assets.images.omiWithoutRope.path;
       }
     }
 

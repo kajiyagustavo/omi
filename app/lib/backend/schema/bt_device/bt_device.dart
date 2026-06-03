@@ -200,6 +200,8 @@ Future<DeviceType?> getTypeOfBluetoothDevice(BluetoothDevice device) async {
     deviceType = DeviceType.bee;
   } else if (BtDevice.isPlaudDeviceFromDevice(device)) {
     deviceType = DeviceType.plaud;
+  } else if (BtDevice.isAirecDeviceFromDevice(device)) {
+    deviceType = DeviceType.airec;
   } else if (BtDevice.isFieldyDeviceFromDevice(device)) {
     deviceType = DeviceType.fieldy;
   } else if (BtDevice.isFriendPendantDeviceFromDevice(device)) {
@@ -225,7 +227,7 @@ Future<DeviceType?> getTypeOfBluetoothDevice(BluetoothDevice device) async {
   return deviceType;
 }
 
-enum DeviceType { omi, openglass, frame, appleWatch, plaud, bee, fieldy, friendPendant, limitless }
+enum DeviceType { omi, openglass, frame, appleWatch, plaud, bee, fieldy, friendPendant, limitless, airec }
 
 Map<String, DeviceType> cachedDevicesMap = {};
 
@@ -642,6 +644,7 @@ class BtDevice {
       case DeviceType.openglass:
       case DeviceType.frame:
       case DeviceType.appleWatch:
+      case DeviceType.airec:
         return ''; // No warning needed
     }
   }
@@ -680,6 +683,7 @@ class BtDevice {
       case DeviceType.openglass:
       case DeviceType.frame:
       case DeviceType.appleWatch:
+      case DeviceType.airec:
         return ''; // No warning needed
     }
   }
@@ -694,6 +698,7 @@ class BtDevice {
   static bool isSupportedDevice(ScanResult result) {
     return isBeeDevice(result) ||
         isPlaudDevice(result) ||
+        isAirecDevice(result) ||
         isFieldyDevice(result) ||
         isFriendPendantDevice(result) ||
         isLimitlessDevice(result) ||
@@ -748,6 +753,17 @@ class BtDevice {
 
     // Fallback: name check for compatibility
     return device.platformName.toUpperCase().startsWith('PLAUD');
+  }
+
+  static bool isAirecDevice(ScanResult result) {
+    return result.device.platformName.toUpperCase().startsWith('AIREC');
+  }
+
+  static bool isAirecDeviceFromDevice(BluetoothDevice device) {
+    if (device.servicesList.any((s) => s.uuid == Guid(airecServiceUuid))) {
+      return true;
+    }
+    return device.platformName.toUpperCase().startsWith('AIREC');
   }
 
   static bool isFieldyDevice(ScanResult result) {
@@ -814,6 +830,8 @@ class BtDevice {
       deviceType = DeviceType.bee;
     } else if (isPlaudDevice(result)) {
       deviceType = DeviceType.plaud;
+    } else if (isAirecDevice(result)) {
+      deviceType = DeviceType.airec;
     } else if (isFieldyDevice(result)) {
       deviceType = DeviceType.fieldy;
     } else if (isFriendPendantDevice(result)) {
