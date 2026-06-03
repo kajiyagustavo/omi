@@ -52,12 +52,51 @@ class AirecFrameAssembler {
     }
 
     final packets = <List<int>>[];
+    // TODO(perf): buffer O(n) em removeRange; trocar por Uint8List+índice se a frequência de chunks crescer.
     while (_buf.length >= AirecFraming.frameSize) {
       final frame = _buf.sublist(0, AirecFraming.frameSize);
-      _buf.removeRange(0, AirecFraming.frameSize);
       final pkt = AirecFraming.extractOpusPacket(frame);
-      if (pkt != null) packets.add(pkt);
+      if (pkt != null) {
+        _buf.removeRange(0, AirecFraming.frameSize);
+        packets.add(pkt);
+      } else {
+        // Frame inválido após alinhamento: stream perdeu sincronismo (glitch/reconexão).
+        // Descarta 1 byte (evita reencontrar a mesma posição) e volta a buscar a magic.
+        _buf.removeRange(0, 1);
+        _aligned = false;
+        break;
+      }
     }
+
+    // Se perdemos o alinhamento dentro do loop acima, tenta realinhar agora
+    // com o que sobrou no buffer — pode já conter a próxima magic.
+    if (!_aligned && _buf.isNotEmpty) {
+      final idx = _findMagic(_buf);
+      if (idx < 0) {
+        if (_buf.isNotEmpty) {
+          final last = _buf.last;
+          _buf.clear();
+          if (last == AirecFraming.magic0) _buf.add(last);
+        }
+        return packets;
+      }
+      _buf.removeRange(0, idx);
+      _aligned = true;
+      // Tenta extrair frames completos do buffer reposicionado.
+      while (_buf.length >= AirecFraming.frameSize) {
+        final frame = _buf.sublist(0, AirecFraming.frameSize);
+        final pkt = AirecFraming.extractOpusPacket(frame);
+        if (pkt != null) {
+          _buf.removeRange(0, AirecFraming.frameSize);
+          packets.add(pkt);
+        } else {
+          _buf.removeRange(0, 1);
+          _aligned = false;
+          break;
+        }
+      }
+    }
+
     return packets;
   }
 
@@ -84,6 +123,7 @@ class AirecProtocol {
   static List<int> get stopStream => encodeCommand([0x01, 0x04]);
 
   /// Retorna null se [data] não começa com respMagic ou tem menos de 2 bytes.
+  /// Body vazio (apenas os 2 bytes de magic) é válido — representa um ACK sem corpo.
   static List<int>? parseResponse(List<int> data) {
     if (data.length < 2) return null;
     if (data[0] != respMagic[0] || data[1] != respMagic[1]) return null;
