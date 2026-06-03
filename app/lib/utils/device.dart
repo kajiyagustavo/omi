@@ -104,7 +104,8 @@ class DeviceUtils {
           // Default omi image
           return Assets.images.omiWithoutRope.path;
         case DeviceType.airec:
-          return Assets.images.omiWithoutRope.path;
+          // TODO: asset proprio do AIREC
+          return Assets.images.plaudNotePin.path;
       }
     }
 

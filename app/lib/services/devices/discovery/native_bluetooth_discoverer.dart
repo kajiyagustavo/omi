@@ -68,6 +68,7 @@ class NativeBluetoothDiscoverer extends DeviceDiscoverer {
   static bool _isSupportedPeripheral(BlePeripheral p) {
     return _isBee(p) ||
         _isPlaud(p) ||
+        _isAirec(p) ||
         _isFieldy(p) ||
         _isFriendPendant(p) ||
         _isLimitless(p) ||
@@ -81,6 +82,10 @@ class NativeBluetoothDiscoverer extends DeviceDiscoverer {
 
   static bool _isPlaud(BlePeripheral p) {
     return p.name.toUpperCase().startsWith('PLAUD');
+  }
+
+  static bool _isAirec(BlePeripheral p) {
+    return p.name.toUpperCase().startsWith('AIREC');
   }
 
   static bool _isFieldy(BlePeripheral p) {
@@ -116,6 +121,8 @@ class NativeBluetoothDiscoverer extends DeviceDiscoverer {
       type = DeviceType.bee;
     } else if (_isPlaud(p)) {
       type = DeviceType.plaud;
+    } else if (_isAirec(p)) {
+      type = DeviceType.airec;
     } else if (_isFieldy(p)) {
       type = DeviceType.fieldy;
     } else if (_isFriendPendant(p)) {

@@ -14,6 +14,7 @@ import 'package:omi/services/devices/limitless_connection.dart';
 import 'package:omi/services/devices/models.dart';
 import 'package:omi/services/devices/omi_connection.dart';
 import 'package:omi/services/devices/omiglass_connection.dart';
+import 'package:omi/services/devices/airec_connection.dart';
 import 'package:omi/services/devices/plaud_connection.dart';
 import 'package:omi/utils/logger.dart';
 
@@ -359,6 +360,8 @@ class BtDevice {
       return await _getDeviceInfoFromBee(conn);
     } else if (type == DeviceType.plaud) {
       return await _getDeviceInfoFromPlaud(conn as PlaudDeviceConnection);
+    } else if (type == DeviceType.airec) {
+      return await _getDeviceInfoFromAirec(conn as AirecDeviceConnection);
     } else if (type == DeviceType.fieldy) {
       return await _getDeviceInfoFromFieldy(conn);
     } else if (type == DeviceType.friendPendant) {
@@ -527,6 +530,17 @@ class BtDevice {
       hardwareRevision: hardwareRevision,
       manufacturerName: manufacturerName,
       type: DeviceType.plaud,
+    );
+  }
+
+  // Valores estáticos: AIREC não expõe serviço DIS via BLE.
+  Future _getDeviceInfoFromAirec(AirecDeviceConnection conn) async {
+    return copyWith(
+      modelNumber: 'AIREC',
+      firmwareRevision: '1.0.0',
+      hardwareRevision: '1.0.0',
+      manufacturerName: 'AIREC',
+      type: DeviceType.airec,
     );
   }
 
