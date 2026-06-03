@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 import 'package:airec_core/airec_protocol.dart';
 
@@ -189,6 +191,23 @@ void main() {
       for (final cmd in AirecProtocol.handshake) {
         expect(cmd.take(2).toList(), [0x55, 0xaa]);
       }
+    });
+  });
+
+  // ──────────────────────────────────────────────
+  // Paridade com fixture da Fase 1
+  // ──────────────────────────────────────────────
+  group('paridade com fixture da Fase 1', () {
+    test('599 pacotes Opus de 80 bytes — mesmo resultado do pipeline Python', () {
+      final bytes =
+          File('test/fixtures/captura_bruta.bin').readAsBytesSync();
+      final asm = AirecFrameAssembler();
+      final packets = asm.addBytes(bytes);
+
+      expect(bytes.length, 49152);
+      expect(packets.length, 599);
+      expect(packets.every((p) => p.length == 80), isTrue);
+      expect(packets.first.length, 80);
     });
   });
 }
