@@ -61,6 +61,10 @@ def upload_profile_audio(file_path: str, uid: str):
 
 
 def get_user_has_speech_profile(uid: str, max_age_days: int = None) -> bool:
+    # AIREC self-host: GCS opcional. Sem bucket configurado, não há speech profile
+    # (identificação de locutor desligada) — não bloqueia a transcrição do áudio.
+    if not speech_profiles_bucket:
+        return False
     bucket = storage_client.bucket(speech_profiles_bucket)
     blob = bucket.blob(f'{uid}/speech_profile.wav')
     if not blob.exists():

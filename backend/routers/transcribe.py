@@ -683,6 +683,12 @@ async def _stream_handler(
 
     # Create or get conversation ID early for audio chunk storage
     private_cloud_sync_enabled = user_db.get_user_private_cloud_sync_enabled(uid)
+    # PATCH (AIREC self-host): kill-switch enquanto não há bucket GCS provisionado.
+    # Sem bucket, o salvamento de áudio bruto dá 403 (storage.objects.list) e polui os logs.
+    # Transcrição/memória NÃO dependem disso. Quando o backend migrar pro servidor e tiver
+    # bucket + lifecycle de 4 dias, basta remover DISABLE_PRIVATE_CLOUD_SYNC do .env.
+    if os.getenv('DISABLE_PRIVATE_CLOUD_SYNC', '').lower() == 'true':
+        private_cloud_sync_enabled = False
 
     # Enable speaker identification when user has speech profile or private cloud sync
     has_speech_profile = False

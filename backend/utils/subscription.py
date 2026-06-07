@@ -578,25 +578,38 @@ def has_transcription_credits(uid: str) -> bool:
     """
     Checks if a user has transcribing credits by verifying their valid subscription and usage.
     """
+    # PATCH (AIREC self-host): com a chave Deepgram global no ambiente, todo áudio usa a
+    # SUA chave (BYOK global) — não existe quota Omi a impor. Curto-circuita ANTES de qualquer
+    # leitura Firestore. Motivo: um pico de rede (504 Deadline Exceeded em get_byok_state)
+    # nesta checagem derrubava o _stream_handler inteiro → captura intermitente. A verificação
+    # de créditos NUNCA deve poder matar a sessão de áudio neste deploy.
+    if os.getenv('DEEPGRAM_API_KEY'):
+        return True
+
     # BYOK users pay Deepgram directly — there's no Omi-side transcription quota to enforce.
     # Require the Deepgram header on this request so a user can't activate BYOK
     # with fake fingerprints then omit x-byok-deepgram to ride Omi's key.
-    if users_db.is_byok_active(uid) and get_byok_key('deepgram'):
-        return True
+    # Defensivo: se o Firestore soluçar aqui, fail-open (assume crédito) em vez de crashar a sessão.
+    try:
+        if users_db.is_byok_active(uid) and get_byok_key('deepgram'):
+            return True
 
-    subscription = users_db.get_user_valid_subscription(uid)
-    if not subscription:
-        return False
-
-    usage = get_monthly_usage_for_subscription(uid)
-    limits = get_plan_limits(subscription.plan)
-
-    # Check transcription seconds (0 means unlimited)
-    if limits.transcription_seconds and limits.transcription_seconds > 0:
-        if usage.get('transcription_seconds', 0) >= limits.transcription_seconds:
+        subscription = users_db.get_user_valid_subscription(uid)
+        if not subscription:
             return False
 
-    return True
+        usage = get_monthly_usage_for_subscription(uid)
+        limits = get_plan_limits(subscription.plan)
+
+        # Check transcription seconds (0 means unlimited)
+        if limits.transcription_seconds and limits.transcription_seconds > 0:
+            if usage.get('transcription_seconds', 0) >= limits.transcription_seconds:
+                return False
+
+        return True
+    except Exception as e:
+        logger.warning(f"has_transcription_credits: erro lendo subscrição ({type(e).__name__}); fail-open p/ não derrubar a sessão. uid={uid}")
+        return True
 
 
 def get_remaining_transcription_seconds(uid: str) -> int | None:

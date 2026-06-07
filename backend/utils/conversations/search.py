@@ -5,13 +5,22 @@ from typing import Dict
 
 import typesense
 
-client = typesense.Client(
-    {
-        'nodes': [{'host': os.getenv('TYPESENSE_HOST'), 'port': os.getenv('TYPESENSE_HOST_PORT'), 'protocol': 'https'}],
-        'api_key': os.getenv('TYPESENSE_API_KEY'),
-        'connection_timeout_seconds': 2,
-    }
-)
+# AIREC self-host: Typesense (busca full-text) é opcional. O upstream instancia o
+# client no import e quebra o boot quando TYPESENSE_API_KEY não está definido
+# (ConfigError). Guard no mesmo estilo do `database/vector_db.py` (Pinecone): sem
+# chave, client=None e a busca fica desligada — não afeta o caminho de áudio ao vivo.
+if os.getenv('TYPESENSE_API_KEY'):
+    client = typesense.Client(
+        {
+            'nodes': [
+                {'host': os.getenv('TYPESENSE_HOST'), 'port': os.getenv('TYPESENSE_HOST_PORT'), 'protocol': 'https'}
+            ],
+            'api_key': os.getenv('TYPESENSE_API_KEY'),
+            'connection_timeout_seconds': 2,
+        }
+    )
+else:
+    client = None
 
 
 def search_conversations(
