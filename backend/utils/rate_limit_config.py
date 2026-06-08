@@ -74,8 +74,10 @@ RATE_POLICIES: dict[str, tuple[int, int]] = {
     "knowledge_graph:rebuild": (2, 3600),
     "wrapped:generate": (2, 86400),
     # Integration (key = app_id:uid)
-    "integration:conversations": (10, 3600),
-    "integration:memories": (60, 3600),
+    # Backfill self-hosted (gateway WhatsApp→Omi): limite alto pro app pessoal
+    # ingerir histórico em massa. O cap baixo original (10/h) é p/ apps de terceiros.
+    "integration:conversations": (2000, 3600),
+    "integration:memories": (2000, 3600),
     # Phone verification uses IP-based rate_limit_dependency (pre-auth, no UID).
     # Not migrated to per-UID Lua limiter intentionally.
     # Dev API
