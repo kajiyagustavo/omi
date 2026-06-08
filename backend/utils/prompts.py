@@ -36,16 +36,24 @@ WORKFLOW:
 THE CATEGORIZATION TEST (CRITICAL):
 For EVERY potential memory, ask these questions IN ORDER:
 
-Q1: "Is this wisdom/advice FROM someone else that {user_name} can learn from?"
-    → If YES: This is an INTERESTING memory. Include attribution (who said it).
+Q1: "Is this wisdom/advice/teaching/knowledge FROM someone else or a content source that {user_name} can learn from?"
+    → If YES: This is an INTERESTING memory. Include attribution (who/what source said it).
     → If NO: Go to Q2.
+    NOTE: This INCLUDES knowledge from LEARNING CONTENT the user consumed or attended —
+    sermons/preaching, lectures, classes, talks, courses, podcasts, books, audiobooks, study sessions.
+    A teaching, concept, principle, framework, mental model, scripture/quote, or illustration
+    presented in such content IS an interesting memory — capture the core idea with attribution
+    (e.g. "Pastor Alan taught that grace is perfected in human weakness", "Lecture explained that
+    compound interest grows exponentially"). Do NOT discard these as "common knowledge": the value
+    is that {user_name} engaged with this specific teaching and wants to recall it later.
 
 Q2: "Is this a fact ABOUT {user_name} - their opinions, realizations, network, or actions?"
     → If YES: This is a SYSTEM memory.
     → If NO: Probably should NOT be extracted at all.
 
 NEVER put {user_name}'s own realizations or opinions in INTERESTING.
-INTERESTING is ONLY for external wisdom from others that {user_name} can learn from.
+INTERESTING is for external wisdom from OTHER PEOPLE or from LEARNING CONTENT (sermons, lectures,
+classes, talks, courses, podcasts, books) that {user_name} can learn from.
 
 INTERESTING MEMORIES (External Wisdom You Can Learn From):
 These are actionable advice, frameworks, and strategies FROM OTHER PEOPLE/SOURCES that {user_name} can learn from and apply.
@@ -68,6 +76,14 @@ EXAMPLES OF GOOD INTERESTING MEMORIES:
 ✅ "Hormozi on influencers: first influencers I know, second ask my network, third influencers I follow"
 ✅ "YC advice: find competitors of your most successful customers"
 ✅ "Keshav: get advisors in companies you want to target (ex-CEOs work well)"
+
+EXAMPLES OF GOOD INTERESTING MEMORIES FROM LEARNING CONTENT (sermons, lectures, classes, talks, podcasts, books):
+✅ "Pastor Alan taught that God's grace is an unmerited gift perfected in human weakness (2 Cor 12:9)"
+✅ "Sermon: the gospel is for the tired and broken, not the strong and self-sufficient"
+✅ "Lecture: spaced repetition beats cramming because retrieval strengthens long-term memory"
+✅ "Podcast guest argued that running toward God is more effective than merely fleeing sin"
+✅ "Talk: social media incentivizes artificial versions of ourselves, hiding our real weaknesses"
+✅ "Book: compound interest grows exponentially, so starting to invest early matters more than amount"
 
 EXAMPLES OF WHAT IS NOT INTERESTING (should be SYSTEM or excluded):
 ❌ "{user_name} realized multiple cofounders are essential" (user's OWN realization → SYSTEM)
@@ -159,8 +175,11 @@ NEVER EXTRACT (Absolute Rules):
 1. **NEWS & ANNOUNCEMENTS**: Product releases, acquisitions, feature launches, company news
    ❌ "Company X acquired startup Y" / "OpenAI released a new model" / "Apple announced..."
 
-2. **GENERAL KNOWLEDGE**: Science facts, geography, statistics not about the user
+2. **GENERAL KNOWLEDGE** (random trivia NOT tied to content the user engaged with):
    ❌ "Light travels at 186,000 miles per second" / "Certain plants are toxic to pets"
+   EXCEPTION: if the knowledge is a teaching/concept from LEARNING CONTENT the user attended or
+   consumed (sermon, lecture, class, talk, course, podcast, book), it IS interesting — see Q1.
+   The test is engagement: passing trivia in smalltalk = skip; a taught concept in a class/sermon = keep.
 
 3. **PRODUCT DOCUMENTATION**: How features work, product capabilities, technical specs
    ❌ "Feature X enables automated workflows" / "The API can process documents"
