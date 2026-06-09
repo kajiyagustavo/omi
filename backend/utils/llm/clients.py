@@ -102,7 +102,7 @@ def _cached_anthropic(api_key: str) -> anthropic.AsyncAnthropic:
     cache_key = _hash_key(api_key)
     inst = _anthropic_cache.get(cache_key)
     if inst is None:
-        inst = anthropic.AsyncAnthropic(api_key=api_key)
+        inst = anthropic.AsyncAnthropic(api_key=api_key, base_url=os.getenv("ANTHROPIC_BASE_URL") or None)
         _anthropic_cache[cache_key] = inst
     return inst
 
@@ -137,7 +137,10 @@ def _create_byok_client(
 
 
 # Anthropic client for chat agent (module-level, BYOK-aware)
-_default_anthropic_client = anthropic.AsyncAnthropic()  # uses ANTHROPIC_API_KEY env var
+# base_url=None => default Anthropic API; set ANTHROPIC_BASE_URL to route the chat agent
+# through an Anthropic-compatible endpoint (e.g. GLM/Z.ai). Pair with ANTHROPIC_AGENT_MODEL.
+_anthropic_base_url = os.getenv("ANTHROPIC_BASE_URL") or None
+_default_anthropic_client = anthropic.AsyncAnthropic(base_url=_anthropic_base_url)
 anthropic_client = _AnthropicClientProxy(_default_anthropic_client)
 
 
@@ -613,8 +616,10 @@ if _so_gemini:
 # ---------------------------------------------------------------------------
 # Anthropic — model resolved from active QoS profile
 # ---------------------------------------------------------------------------
-ANTHROPIC_AGENT_MODEL = get_model('chat_agent')
-ANTHROPIC_AGENT_COMPLEX_MODEL = get_model('chat_agent')
+# ANTHROPIC_AGENT_MODEL env override lets a self-hosted deploy pin the chat-agent model
+# (e.g. glm-4.6 via Z.ai) without editing the QoS profile map; falls back to the profile.
+ANTHROPIC_AGENT_MODEL = os.getenv('ANTHROPIC_AGENT_MODEL') or get_model('chat_agent')
+ANTHROPIC_AGENT_COMPLEX_MODEL = os.getenv('ANTHROPIC_AGENT_MODEL') or get_model('chat_agent')
 
 
 # ---------------------------------------------------------------------------
