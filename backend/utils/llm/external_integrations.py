@@ -285,7 +285,15 @@ Respond with ONLY valid JSON. Do not include any other text or comments."""
         response = re.sub(r':\s*\\"([^"]*)\\"', r': "\1"', response)
         response = response.replace('\\"', '"')
 
-        summary_data = json.loads(response)
+        try:
+            summary_data = json.loads(response)
+        except json.JSONDecodeError:
+            # Fallback de robustez: LLMs às vezes emitem caracteres de controle
+            # crus (newline/tab literais) DENTRO de strings, que o JSON strict
+            # rejeita ("Invalid control character"). strict=False os tolera sem
+            # mexer na estrutura, preservando o conteúdo, antes de cair no
+            # resumo genérico.
+            summary_data = json.loads(response, strict=False)
 
         # Helper to map conversation number to ID
         def get_convo_id(num):
