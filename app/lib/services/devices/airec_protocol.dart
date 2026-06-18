@@ -127,6 +127,18 @@ class AirecProtocol {
   static List<int> get startStream => encodeCommand([0x01, 0x03]);
   static List<int> get stopStream => encodeCommand([0x01, 0x04]);
 
+  /// Comando de data-hora: 55aa0f02 + 14 chars ASCII do timestamp (AAAAMMDDHHMMSS).
+  /// A Fase 1 (Python) provou que SEM este comando o device não arma o stream de áudio.
+  static List<int> cmdDatahora(DateTime now) {
+    final ts = '${now.year.toString().padLeft(4, '0')}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+    return [0x55, 0xaa, 0x0f, 0x02, ...ts.codeUnits];
+  }
+
   /// Retorna null se [data] não começa com respMagic ou tem menos de 2 bytes.
   /// Body vazio (apenas os 2 bytes de magic) é válido — representa um ACK sem corpo.
   static List<int>? parseResponse(List<int> data) {
@@ -135,9 +147,11 @@ class AirecProtocol {
     return data.sublist(2);
   }
 
-  /// Sequência de handshake validada fisicamente com o aparelho AIREC.
-  /// Ordem importa — não reordenar.
-  static List<List<int>> get handshake => [
+  /// Sequência de handshake validada fisicamente com o aparelho AIREC (Fase 1, Python).
+  /// Ordem importa — não reordenar. O comando de data-hora (cmdDatahora) entra entre
+  /// 55aa026600 e 55aa0130, exatamente como em montar_handshake() do protocolo.py.
+  /// SEM ele o device responde os comandos mas NÃO inicia o stream de áudio.
+  static List<List<int>> handshakeSeq(DateTime now) => [
         [0x55, 0xaa, 0x01, 0x01],
         [0x55, 0xaa, 0x01, 0x20],
         [0x55, 0xaa, 0x01, 0x0f],
@@ -148,6 +162,7 @@ class AirecProtocol {
         [0x55, 0xaa, 0x02, 0x69, 0x00],
         [0x55, 0xaa, 0x01, 0x05],
         [0x55, 0xaa, 0x02, 0x66, 0x00],
+        cmdDatahora(now), // <-- comando de data-hora (faltava)
         [0x55, 0xaa, 0x01, 0x30],
         [0x55, 0xaa, 0x01, 0x05],
         [0x55, 0xaa, 0x01, 0x0e],
@@ -158,4 +173,8 @@ class AirecProtocol {
         [0x55, 0xaa, 0x01, 0x03],
         [0x55, 0xaa, 0x02, 0x21, 0x54],
       ];
+
+  /// Mantido por compatibilidade (sequência sem data-hora — NÃO inicia áudio).
+  @Deprecated('Use handshakeSeq(now) — inclui o comando de data-hora obrigatório')
+  static List<List<int>> get handshake => handshakeSeq(DateTime(2026, 1, 1));
 }
