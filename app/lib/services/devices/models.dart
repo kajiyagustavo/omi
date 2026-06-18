@@ -58,11 +58,13 @@ const String plaudWriteCharUuid = "00002bb1-0000-1000-8000-00805f9b34fb";
 const String plaudNotifyCharUuid = "00002bb0-0000-1000-8000-00805f9b34fb";
 
 // AIREC — UUIDs do serviço custom (engenharia reversa, captura BLE validada).
-// TODO: confirmar service UUID nos logs de descoberta no 1o pareamento.
-const String airecServiceUuid = "00112000-2233-4455-6677-8899dfdedddc";
+// Serviço CONFIRMADO no pareamento real (2026-06-04): ...200a (não ...2000 inferido).
+// Características reais expostas: 201a (áudio/0x0003), 202a (cmd/0x0006), 203a (resp/0x0008), 204a.
+const String airecServiceUuid = "0011200a-2233-4455-6677-8899dfdedddc";
 const String airecCommandCharUuid = "0011202a-2233-4455-6677-8899dfdedddc"; // escreve 55aa<cmd>
 const String airecResponseCharUuid = "0011203a-2233-4455-6677-8899dfdedddc"; // recebe aa55<cmd>
 const String airecAudioCharUuid = "0011201a-2233-4455-6677-8899dfdedddc"; // stream de áudio
+const String airecStatusCharUuid = "0011204a-2233-4455-6677-8899dfdedddc"; // status (0x000b) — Fase 1 inscreve
 
 const String beeServiceUuid = "03d5d5c4-a86c-11ee-9d89-8f2089a49e7e";
 
