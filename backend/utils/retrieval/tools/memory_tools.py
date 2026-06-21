@@ -56,26 +56,21 @@ def get_memories_tool(
     - User asks about specific events/incidents (use search_conversations_tool instead)
     - Questions like "when did X happen?", "what happened at Y?", "when did I get Z?"
 
-    Memory retrieval guidance - choosing the right limit:
-    - **CRITICAL**: For ANY question asking about basic personal information (name, age, location, background, etc.) or multiple personal facts together, you MUST use limit=5000 to get ALL memories
-    - **For GENERAL COMPREHENSIVE questions, you MUST use limit=5000** to get ALL memories
-    - **For specific questions about a single narrow topic, you can use limit=50-200**
-    - Examples when you MUST use limit=5000:
-      * "what do you know about me"
-      * "tell me about myself"
-      * "what's my name, age, and location"
-      * "who am I"
-      * "what's my profile"
-      * "what's my age"
-      * "where do I live"
-      * "tell me everything"
-      * "what are all my interests"
-      * Any question asking for multiple personal facts together
-    - Examples when limit=50-200 is acceptable:
-      * "what conversations did I have about Python"
+    Memory retrieval guidance - PREFER semantic search:
+    - **DEFAULT**: For almost every question, use `search_memories_tool` first — it does semantic
+      vector search and returns only the relevant memories. It is far faster and cheaper than loading
+      everything, especially when the user has thousands of memories.
+    - **Use this tool (get_memories_tool) with a SMALL limit (50-200)** when you need a broad but
+      bounded slice, e.g. recent facts or a category overview.
+    - **Only use limit=5000 (load ALL) for truly exhaustive requests** like "tell me everything you
+      know about me" / "what's my full profile" / "list all my interests" — and even then, prefer
+      search_memories_tool unless the user explicitly wants an exhaustive dump. Loading all memories
+      can be slow and expensive with large memory counts.
+    - Examples best served by search_memories_tool (NOT a full load):
+      * "what's my sales philosophy"
       * "what do I know about machine learning"
-      * Questions about a specific narrow topic
-    - **Ask user for confirmation** before fetching 500+ memories for very broad analysis, as it may take longer
+      * "what's my name" / "where do I live" / "who am I" (a few targeted facts)
+      * Any question answerable by a handful of relevant memories
     - **Maximum limit is 5000 per call** - use pagination (offset parameter) if more are needed
 
     Args:
