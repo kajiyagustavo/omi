@@ -13,7 +13,7 @@ from database.vector_db import (
     upsert_memory_vector,
     upsert_memory_vectors_batch,
 )
-from models.memories import MemoryDB, Memory, MemoryCategory
+from models.memories import MemoryDB, Memory, MemoryCategory, MemorySource
 from utils.apps import update_personas_async
 from utils.other import endpoints as auth
 
@@ -55,7 +55,7 @@ async def create_memory(
     uid: str = Depends(auth.with_rate_limit(auth.get_current_user_uid, "memories:create")),
 ):
     memory.category = MemoryCategory.manual
-    memory_db = MemoryDB.from_memory(memory, uid, None, True)
+    memory_db = MemoryDB.from_memory(memory, uid, None, True, source=MemorySource.manual)
 
     # Build payload outside try so serialization bugs aren't misreported as
     # transient 503s — only the Firestore write should be retryable.
@@ -108,7 +108,7 @@ async def create_memories_batch(
     has_public = False
     for memory in request.memories:
         memory.category = MemoryCategory.manual
-        memory_db = MemoryDB.from_memory(memory, uid, None, True)
+        memory_db = MemoryDB.from_memory(memory, uid, None, True, source=MemorySource.manual)
         memory_dbs.append(memory_db)
         if memory.visibility == 'public':
             has_public = True
@@ -139,7 +139,12 @@ async def create_memories_batch(
 
 
 @router.get('/v3/memories', tags=['memories'], response_model=List[MemoryDB])
-def get_memories(limit: int = 100, offset: int = 0, uid: str = Depends(auth.get_current_user_uid)):
+def get_memories(
+    limit: int = 100,
+    offset: int = 0,
+    source: Optional[str] = None,
+    uid: str = Depends(auth.get_current_user_uid),
+):
     # Use high limits for the first page
     # Warn: should remove
     if offset == 0:
@@ -159,6 +164,10 @@ def get_memories(limit: int = 100, offset: int = 0, uid: str = Depends(auth.get_
                 f"Skipping invalid memory doc {memory.get('id', 'unknown')}: missing/invalid fields {missing_fields}"
             )
             continue
+
+    if source:
+        valid_memories = [m for m in valid_memories if m.source and m.source.value == source]
+
     return valid_memories
 
 
