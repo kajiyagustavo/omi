@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -15,6 +15,8 @@ import database.users as users_db
 import database.redis_db as redis_db
 from utils.other import endpoints as auth
 from utils.log_sanitizer import sanitize
+from utils.retrieval.tools.google_utils import refresh_google_token
+from utils.retrieval.tools.calendar_tools import get_google_calendar_events, create_google_calendar_event
 import logging
 
 logger = logging.getLogger(__name__)
@@ -316,11 +318,16 @@ class OAuthUrlResponse(BaseModel):
 
 
 @router.get("/v1/integrations/{app_key}/oauth-url", response_model=OAuthUrlResponse, tags=['integrations'])
-def get_oauth_url(app_key: str, uid: str = Depends(auth.get_current_user_uid)):
+def get_oauth_url(
+    app_key: str,
+    web_redirect: Optional[str] = Query(None, description="URL da web UI p/ redirecionar após conectar"),
+    uid: str = Depends(auth.get_current_user_uid),
+):
     """
     Get OAuth authorization URL for an integration.
     Frontend opens this URL in browser to start OAuth flow.
     Uses secure random state tokens to prevent CSRF attacks.
+    Se web_redirect for passado, o callback redireciona pra essa URL (fluxo web) em vez do omi:// (mobile).
     """
     base_url = os.getenv('BASE_API_URL')
     if not base_url:
@@ -334,6 +341,9 @@ def get_oauth_url(app_key: str, uid: str = Depends(auth.get_current_user_uid)):
     try:
         state_key = f"oauth_state:{state_token}"
         state_data = {'uid': uid, 'app_key': app_key, 'created_at': datetime.now(timezone.utc).isoformat()}
+        # Só aceita web_redirect pro nosso domínio (evita open-redirect)
+        if web_redirect and web_redirect.startswith('https://omi.elevare.club/'):
+            state_data['web_redirect'] = web_redirect
         redis_db.r.setex(state_key, OAUTH_STATE_EXPIRY, json.dumps(state_data))
     except Exception as e:
         logger.error(f'ERROR: Failed to store OAuth state in Redis: {e}')
@@ -482,8 +492,11 @@ async def handle_oauth_callback(
                 logger.error(f'{app_key}: Error storing tokens in Firebase: {e}')
                 return render_oauth_response(request, app_key, success=False, error_type='server_error')
 
+            # Web flow: redireciona pra web UI; mobile: deep link omi://
+            web_redirect = state_data.get('web_redirect')
+            if web_redirect:
+                return RedirectResponse(url=web_redirect + ('&' if '?' in web_redirect else '?') + 'calendar=connected')
             deep_link = f'omi://{app_key}/callback?success=true'
-
             return render_oauth_response(request, app_key, success=True, redirect_url=deep_link)
         else:
             error_body = token_response.text[:500] if token_response.text else "No error body"
@@ -547,6 +560,74 @@ async def oauth_callback(
             },
         )
         return await handle_oauth_callback(request, normalized_key, code, state, config)
+
+
+# *****************************
+# ***** CALENDAR EVENTS (REST) *
+# *****************************
+
+
+async def _calendar_access_token(uid: str) -> str:
+    """Get a usable Google Calendar access token for uid, refreshing if needed."""
+    integration = users_db.get_integration(uid, 'google_calendar')
+    if not integration:
+        raise HTTPException(status_code=409, detail="Google Calendar não conectado")
+    token = integration.get('access_token')
+    # Tenta refresh proativo se houver refresh_token (o get_calendar_events trata 401 internamente,
+    # mas refrescar aqui evita falha na 1ª chamada quando o token está expirado).
+    refreshed = await refresh_google_token(uid, integration)
+    return refreshed or token
+
+
+class CreateCalendarEventRequest(BaseModel):
+    summary: str = Field(description="Título do evento")
+    start_time: datetime = Field(description="Início (ISO 8601 com timezone)")
+    end_time: datetime = Field(description="Fim (ISO 8601 com timezone)")
+    description: Optional[str] = Field(default=None)
+    location: Optional[str] = Field(default=None)
+    attendees: Optional[list] = Field(default=None, description="Lista de emails")
+
+
+@router.get("/v1/integrations/google_calendar/events", tags=['integrations'])
+async def list_calendar_events(
+    start_date: Optional[datetime] = Query(None, description="Início (ISO). Default: agora"),
+    end_date: Optional[datetime] = Query(None, description="Fim (ISO). Default: +7 dias"),
+    max_results: int = Query(20, ge=1, le=50),
+    search_query: Optional[str] = Query(None),
+    uid: str = Depends(auth.get_current_user_uid),
+):
+    """Lista eventos do Google Calendar do usuário (read-only)."""
+    token = await _calendar_access_token(uid)
+    try:
+        events = await get_google_calendar_events(
+            token, time_min=start_date, time_max=end_date, max_results=max_results, search_query=search_query
+        )
+    except Exception as e:
+        logger.error(f"calendar list failed for {uid}: {sanitize(str(e))}")
+        raise HTTPException(status_code=502, detail="Falha ao buscar eventos do Google Calendar")
+    return {"events": events}
+
+
+@router.post("/v1/integrations/google_calendar/events", tags=['integrations'])
+async def create_calendar_event(
+    request: CreateCalendarEventRequest, uid: str = Depends(auth.get_current_user_uid)
+):
+    """Cria um evento no Google Calendar do usuário."""
+    token = await _calendar_access_token(uid)
+    try:
+        event = await create_google_calendar_event(
+            token,
+            summary=request.summary,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            description=request.description,
+            location=request.location,
+            attendees=request.attendees,
+        )
+    except Exception as e:
+        logger.error(f"calendar create failed for {uid}: {sanitize(str(e))}")
+        raise HTTPException(status_code=502, detail="Falha ao criar evento no Google Calendar")
+    return event
 
 
 @router.on_event("shutdown")
