@@ -2,6 +2,12 @@
 
 Stubs the heavy import chain (GCS/OpenAI/Firestore) so routers.memories imports without
 creds. models.* stay real so MemoryDB validation behaves like production.
+
+NOTE: this module installs stub `database.*` entries into sys.modules at import time
+(same pattern as test_llm_usage_endpoints.py). test.sh runs each test file in its own
+pytest process, so the stubs do not leak across files in CI. Do NOT run this file in the
+same process as tests that exercise the real database.vector_db / database.memories
+(e.g. test_memories_batch.py) — the shared sys.modules stubs would break those.
 """
 
 import os
