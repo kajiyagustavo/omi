@@ -6,6 +6,7 @@ from typing import Optional, List
 from pydantic import BaseModel, Field, validator
 
 from database._client import document_id_from_seed
+from models.conversation_enums import CategoryEnum
 
 
 class MemoryCategory(str, Enum):
@@ -25,6 +26,15 @@ class MemoryCategory(str, Enum):
     learnings = "learnings"
     other = "other"
     auto = "auto"
+
+
+class MemorySource(str, Enum):
+    whatsapp = "whatsapp"
+    recording = "recording"  # native Omi recording (ConversationSource.omi)
+    plaud = "plaud"
+    email = "email"
+    manual = "manual"
+    other = "other"  # fallback for unmapped origin
 
 
 # Only define boosts for the primary categories
@@ -121,6 +131,8 @@ class MemoryDB(Memory):
     edited: bool = False
     scoring: Optional[str] = None
     app_id: Optional[str] = None
+    source: Optional[MemorySource] = None
+    topic: Optional[CategoryEnum] = None
     data_protection_level: Optional[str] = None
     is_locked: bool = False
     kg_extracted: bool = False
@@ -140,7 +152,14 @@ class MemoryDB(Memory):
         return "{:02d}_{:02d}_{:010d}".format(user_manual_added_boost, cat_boost, int(memory.created_at.timestamp()))
 
     @staticmethod
-    def from_memory(memory: Memory, uid: str, conversation_id: str, manually_added: bool) -> 'MemoryDB':
+    def from_memory(
+        memory: Memory,
+        uid: str,
+        conversation_id: str,
+        manually_added: bool,
+        source: Optional['MemorySource'] = None,
+        topic: Optional[CategoryEnum] = None,
+    ) -> 'MemoryDB':
         memory_db = MemoryDB(
             id=document_id_from_seed(memory.content),
             uid=uid,
@@ -154,6 +173,8 @@ class MemoryDB(Memory):
             user_review=True if manually_added else None,
             reviewed=True,
             visibility=memory.visibility,
+            source=source,
+            topic=topic,
         )
         memory_db.scoring = MemoryDB.calculate_score(memory_db)
         return memory_db
