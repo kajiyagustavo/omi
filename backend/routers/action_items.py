@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 
 import database.action_items as action_items_db
 import database.conversations as conversations_db
+import database.journal_summaries as journal_summaries_db
 import database.redis_db as redis_db
 from database.vector_db import (
     upsert_action_item_vector,
@@ -39,6 +40,8 @@ class CreateActionItemRequest(BaseModel):
     conversation_id: Optional[str] = Field(
         default=None, description="ID of the conversation this action item came from"
     )
+    priority: Optional[str] = Field(default=None, description="Task priority: high | medium | low")
+    parent_id: Optional[str] = Field(default=None, description="Parent action item id (for subtasks)")
 
 
 class UpdateActionItemRequest(BaseModel):
@@ -51,6 +54,8 @@ class UpdateActionItemRequest(BaseModel):
     apple_reminder_id: Optional[str] = Field(default=None, description="EventKit calendarItemIdentifier")
     sort_order: Optional[int] = Field(default=None, description="Manual sort order within category")
     indent_level: Optional[int] = Field(default=None, ge=0, le=3, description="Indentation level (0-3)")
+    priority: Optional[str] = Field(default=None, description="Task priority: high | medium | low")
+    parent_id: Optional[str] = Field(default=None, description="Parent action item id (for subtasks)")
 
 
 class ActionItemResponse(BaseModel):
@@ -69,6 +74,8 @@ class ActionItemResponse(BaseModel):
     apple_reminder_id: Optional[str] = None
     sort_order: int = 0
     indent_level: int = 0
+    priority: Optional[str] = None
+    parent_id: Optional[str] = None
 
 
 def _get_valid_action_item(uid: str, action_item_id: str) -> dict:
@@ -201,6 +208,10 @@ def create_action_item(request: CreateActionItemRequest, uid: str = Depends(auth
         'due_at': request.due_at,
         'conversation_id': request.conversation_id,
     }
+    if request.priority is not None:
+        action_item_data['priority'] = request.priority
+    if request.parent_id is not None:
+        action_item_data['parent_id'] = request.parent_id
 
     action_item_id = action_items_db.create_action_item(uid, action_item_data)
     action_item = action_items_db.get_action_item(uid, action_item_id)
@@ -344,6 +355,10 @@ def update_action_item(
         update_data['sort_order'] = request.sort_order
     if request.indent_level is not None:
         update_data['indent_level'] = request.indent_level
+    if request.priority is not None:
+        update_data['priority'] = request.priority
+    if request.parent_id is not None:
+        update_data['parent_id'] = request.parent_id
 
     # Update the action item
     success = action_items_db.update_action_item(uid, action_item_id, update_data)
@@ -627,3 +642,47 @@ def accept_shared_action_items(request: AcceptSharedTasksRequest, uid: str = Dep
         raise HTTPException(status_code=402, detail="Shared tasks are no longer available.")
 
     return {"created": created_ids, "count": len(created_ids)}
+
+
+# *****************************
+# ***** JOURNAL SUMMARIES *****
+# *****************************
+
+
+class JournalSummaryRequest(BaseModel):
+    summary: str = Field(description="The generated day summary text to persist")
+
+
+def _valid_date(date: str) -> bool:
+    try:
+        datetime.strptime(date, "%Y-%m-%d")
+        return True
+    except (ValueError, TypeError):
+        return False
+
+
+@router.get("/v1/journal-summaries/{date}", tags=['journal'])
+def get_journal_summary(date: str, uid: str = Depends(auth.get_current_user_uid)):
+    """Get the stored journal summary for a date (YYYY-MM-DD)."""
+    if not _valid_date(date):
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    doc = journal_summaries_db.get_journal_summary(uid, date)
+    return doc or {"date": date, "summary": None}
+
+
+@router.put("/v1/journal-summaries/{date}", tags=['journal'])
+def put_journal_summary(
+    date: str, request: JournalSummaryRequest, uid: str = Depends(auth.get_current_user_uid)
+):
+    """Create/overwrite the journal summary for a date (so it is not regenerated)."""
+    if not _valid_date(date):
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    return journal_summaries_db.set_journal_summary(uid, date, request.summary)
+
+
+@router.delete("/v1/journal-summaries/{date}", status_code=204, tags=['journal'])
+def delete_journal_summary(date: str, uid: str = Depends(auth.get_current_user_uid)):
+    """Delete the stored journal summary for a date (forces regenerate)."""
+    if not _valid_date(date):
+        raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
+    journal_summaries_db.delete_journal_summary(uid, date)
