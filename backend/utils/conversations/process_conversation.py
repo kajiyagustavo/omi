@@ -32,7 +32,7 @@ from utils.llm.memories import resolve_memory_conflict
 from database.apps import record_app_usage, get_omi_personas_by_uid_db, get_app_by_id_db
 from database.vector_db import upsert_vector2, update_vector_metadata
 from models.app import App, UsageHistoryType
-from models.memories import MemoryDB, Memory
+from models.memories import MemoryDB, Memory, MemorySource
 from models.calendar_context import CalendarMeetingContext
 from models.conversation import (
     AppResult,
@@ -40,7 +40,12 @@ from models.conversation import (
     CreateConversation,
     ExternalIntegrationCreateConversation,
 )
-from models.conversation_enums import ConversationSource, ConversationStatus, ExternalIntegrationConversationSource
+from models.conversation_enums import (
+    ConversationSource,
+    ConversationStatus,
+    ExternalIntegrationConversationSource,
+    CategoryEnum,
+)
 from utils.conversations.factory import deserialize_conversation
 from models.other import Person
 from models.structured import Structured
@@ -82,6 +87,22 @@ from utils.task_sync import auto_sync_action_items_batch
 from utils.other.storage import precache_conversation_audio
 
 logger = logging.getLogger(__name__)
+
+WHATSAPP_GATEWAY_APP_ID = "01KTHGQSYBNTM6C8GAVKJS9N6X"
+
+
+def derive_memory_source(conversation) -> MemorySource:
+    src = getattr(conversation, 'source', None)
+    if (
+        src == ConversationSource.external_integration
+        and getattr(conversation, 'app_id', None) == WHATSAPP_GATEWAY_APP_ID
+    ):
+        return MemorySource.whatsapp
+    if src == ConversationSource.plaud:
+        return MemorySource.plaud
+    if src == ConversationSource.omi:
+        return MemorySource.recording
+    return MemorySource.other
 
 
 def _fetch_dedup_candidates(uid: str, structured: Structured) -> List[dict]:
@@ -500,7 +521,15 @@ def _extract_memories_inner(uid: str, conversation: Conversation):
             elif resolution.action == 'keep_both':
                 pass
 
-        memory_db_obj = MemoryDB.from_memory(memory, uid, conversation.id, False)
+        mem_topic = conversation.structured.category if conversation.structured else None
+        memory_db_obj = MemoryDB.from_memory(
+            memory,
+            uid,
+            conversation.id,
+            False,
+            source=derive_memory_source(conversation),
+            topic=mem_topic,
+        )
         memory_db_obj.is_locked = is_locked
         parsed_memories.append(memory_db_obj)
 
