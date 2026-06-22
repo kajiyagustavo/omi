@@ -11,6 +11,7 @@ import 'package:omi/backend/schema/memory.dart';
 import 'package:omi/pages/conversation_detail/conversation_detail_provider.dart';
 import 'package:omi/pages/conversation_detail/page.dart';
 import 'package:omi/pages/memories/page.dart';
+import 'package:omi/pages/memories/widgets/memory_source_chip.dart';
 import 'package:omi/pages/settings/usage_page.dart';
 import 'package:omi/providers/app_provider.dart';
 import 'package:omi/providers/conversation_provider.dart';
@@ -59,7 +60,13 @@ class MemoryItem extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [Text(memory.content.decodeString, style: AppStyles.body)],
+                    children: [
+                      Text(memory.content.decodeString, style: AppStyles.body),
+                      if (memorySourceLabel(context, memory.source) != null) ...[
+                        const SizedBox(height: 8),
+                        buildMemorySourceChip(context, memory.source),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(width: AppStyles.spacingM),

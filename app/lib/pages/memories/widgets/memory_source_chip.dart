@@ -38,7 +38,7 @@ Widget buildMemorySourceChip(BuildContext context, String? source) {
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.08),
+      color: Colors.white.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(8),
     ),
     child: Row(
