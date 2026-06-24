@@ -85,18 +85,9 @@ from utils.webhooks import conversation_created_webhook
 from utils.notifications import send_action_item_data_message
 from utils.task_sync import auto_sync_action_items_batch
 from utils.other.storage import precache_conversation_audio
+from utils.conversations.extraction_gate import auto_extraction_enabled
 
 logger = logging.getLogger(__name__)
-
-
-def auto_extraction_enabled() -> bool:
-    """Gate global da extração automática derivada (memórias/tarefas/trends/grafo).
-
-    Desligável via env var OMI_AUTO_EXTRACTION_ENABLED='false' no self-host.
-    Default ligado (preserva comportamento upstream). Transcrição, criação da
-    conversa, título/overview e save_structured_vector NÃO são afetados.
-    """
-    return os.getenv('OMI_AUTO_EXTRACTION_ENABLED', 'true').strip().lower() != 'false'
 
 
 WHATSAPP_GATEWAY_APP_ID = "01KTHGQSYBNTM6C8GAVKJS9N6X"
