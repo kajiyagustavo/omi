@@ -88,6 +88,17 @@ from utils.other.storage import precache_conversation_audio
 
 logger = logging.getLogger(__name__)
 
+
+def auto_extraction_enabled() -> bool:
+    """Gate global da extração automática derivada (memórias/tarefas/trends/grafo).
+
+    Desligável via env var OMI_AUTO_EXTRACTION_ENABLED='false' no self-host.
+    Default ligado (preserva comportamento upstream). Transcrição, criação da
+    conversa, título/overview e save_structured_vector NÃO são afetados.
+    """
+    return os.getenv('OMI_AUTO_EXTRACTION_ENABLED', 'true').strip().lower() != 'false'
+
+
 WHATSAPP_GATEWAY_APP_ID = "01KTHGQSYBNTM6C8GAVKJS9N6X"
 
 
@@ -802,10 +813,16 @@ def process_conversation(
         )
         if not is_reprocess:
             critical_executor.submit(save_structured_vector, uid, conversation)
-        critical_executor.submit(_extract_memories, uid, conversation)
-        critical_executor.submit(_extract_trends, uid, conversation)
-        critical_executor.submit(_save_action_items, uid, conversation)
-        critical_executor.submit(_update_goal_progress, uid, conversation)
+        if auto_extraction_enabled():
+            critical_executor.submit(_extract_memories, uid, conversation)
+            critical_executor.submit(_extract_trends, uid, conversation)
+            critical_executor.submit(_save_action_items, uid, conversation)
+            critical_executor.submit(_update_goal_progress, uid, conversation)
+        else:
+            logger.info(
+                f'auto-extraction disabled (OMI_AUTO_EXTRACTION_ENABLED=false); '
+                f'skipping memories/trends/action-items/goals for uid={uid} conversation={conversation.id}'
+            )
 
     # Create audio files from chunks if private cloud sync was enabled
     if not is_reprocess and conversation.private_cloud_sync_enabled:
