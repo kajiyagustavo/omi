@@ -21,4 +21,24 @@ void main() {
     expect(find.byType(SizedBox), findsOneWidget);
     expect(find.textContaining(RegExp(r'\w')), findsNothing);
   });
+
+  testWidgets('topic chip capitalizes the category label', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(builder: (ctx) => buildMemoryTopicChip(ctx, 'work')),
+      ),
+    ));
+    expect(find.text('Work'), findsOneWidget);
+  });
+
+  testWidgets('topic chip renders nothing for null/empty/other', (tester) async {
+    for (final t in [null, '', 'other']) {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Builder(builder: (ctx) => buildMemoryTopicChip(ctx, t)),
+        ),
+      ));
+      expect(find.textContaining(RegExp(r'\w')), findsNothing, reason: 'topic=$t');
+    }
+  });
 }

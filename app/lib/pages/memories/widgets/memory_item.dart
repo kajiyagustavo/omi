@@ -62,9 +62,17 @@ class MemoryItem extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(memory.content.decodeString, style: AppStyles.body),
-                      if (memorySourceLabel(context, memory.source) != null) ...[
+                      if (memorySourceLabel(context, memory.source) != null ||
+                          memoryTopicLabel(context, memory.topic) != null) ...[
                         const SizedBox(height: 8),
-                        buildMemorySourceChip(context, memory.source),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            buildMemorySourceChip(context, memory.source),
+                            buildMemoryTopicChip(context, memory.topic),
+                          ],
+                        ),
                       ],
                     ],
                   ),
