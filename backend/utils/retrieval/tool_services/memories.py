@@ -86,10 +86,23 @@ def search_memories_text(
     query: str,
     limit: int = 5,
 ) -> str:
-    """Semantic vector search for memories, formatted as LLM-ready text."""
+    """Semantic vector search for memories, formatted as LLM-ready text.
+
+    Fonte primária: MEMÓRIA UNIFICADA (Karla) — o Omi é interface, não dono
+    dos dados. Fallback: caminho local Firestore/Pinecone (Karla desabilitada,
+    fora do ar ou sem resultados)."""
     logger.info(f"search_memories_text - uid: {uid}, query: {query}, limit: {limit}")
 
     limit = min(limit, 20)
+
+    from utils import memoria_unificada
+    if memoria_unificada.is_enabled():
+        d = memoria_unificada.buscar(query, limite_notas=min(limit, 5))
+        texto = memoria_unificada.formatar_resultado(d, query)
+        if texto:
+            return texto
+        logger.warning("memoria unificada sem resultado/indisponível — "
+                       "fallback Firestore/Pinecone")
 
     try:
         matches = vector_db.find_similar_memories(uid, query, threshold=0.0, limit=limit)
