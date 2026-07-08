@@ -688,3 +688,31 @@ def get_scores(uid: str, date: str = None) -> dict:
         'default_tab': default_tab,
         'date': day.strftime('%Y-%m-%d'),
     }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# MEMÓRIA UNIFICADA (Karla) — F1.5, decisão 08/07: tarefas no banco próprio.
+# Com TAREFAS_KARLA=true, as funções públicas passam a operar sobre a API
+# /u/<token>/tarefas do memory-service (RLS por área). O código Firestore acima
+# fica INTACTO — rollback = desligar a flag. Funções não delegadas (scores,
+# unlock_all) seguem no Firestore até a aposentadoria completa.
+import os as _os
+
+if _os.getenv("TAREFAS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import action_items_karla as _karla
+
+    create_action_item = _karla.create_action_item
+    create_action_items_batch = _karla.create_action_items_batch
+    get_action_item = _karla.get_action_item
+    get_action_items = _karla.get_action_items
+    get_action_items_by_conversation = _karla.get_action_items_by_conversation
+    get_action_items_by_ids = _karla.get_action_items_by_ids
+    update_action_item = _karla.update_action_item
+    batch_update_action_items = _karla.batch_update_action_items
+    mark_action_item_completed = _karla.mark_action_item_completed
+    delete_action_item = _karla.delete_action_item
+    delete_action_items_for_conversation = _karla.delete_action_items_for_conversation
+    batch_set_sync_requested = _karla.batch_set_sync_requested
+    get_pending_apple_reminders_sync = _karla.get_pending_apple_reminders_sync
+    batch_sync_update_action_items = _karla.batch_sync_update_action_items
+    logger.warning("action_items: usando MEMÓRIA UNIFICADA (Karla) — TAREFAS_KARLA on")
