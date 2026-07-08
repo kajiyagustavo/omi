@@ -213,6 +213,27 @@ def generate_comprehensive_daily_summary(
     # Build conversation ID mapping for the LLM
     convo_id_map = {i + 1: c.id for i, c in enumerate(non_discarded)}
 
+    # Atividades do dia na MEMÓRIA UNIFICADA (Karla) — sessões de trabalho com
+    # IA/ferramentas registradas no cérebro. Enriquecem o jornal além do áudio.
+    # Falha/vazio → bloco vazio (jornal segue só com as conversas).
+    atividades_bloco = ''
+    try:
+        from utils import memoria_unificada
+
+        if memoria_unificada.is_enabled() and start_date_utc and end_date_utc:
+            _ativ = memoria_unificada.atividades_do_dia(
+                start_date_utc.isoformat(), end_date_utc.isoformat())
+            if _ativ:
+                atividades_bloco = (
+                    f"\nAdditionally, {user_name}'s unified memory recorded these work "
+                    f"activities today (sessions with AI assistants and tools). Use them "
+                    f"to enrich the headline, overview and decisions_made — for items "
+                    f"sourced ONLY from these activities, omit conversation_number:\n"
+                    f"```\n{_ativ}\n```\n"
+                )
+    except Exception as e:
+        logger.warning(f"daily summary: atividades da memória unificada indisponíveis: {e}")
+
     prompt = f"""You are creating a daily summary for {user_name}. {memories_str}
 OUTPUT LANGUAGE: {output_language}. You MUST write every word of this summary in {output_language}, regardless of the language the conversations are in.
 
@@ -223,7 +244,7 @@ Here are {user_name}'s conversations from today (numbered 1-{total_conversations
 ```
 {conversation_history}
 ```
-
+{atividades_bloco}
 Generate a JSON response. ONLY include sections with genuinely useful content - skip sections entirely if data is thin or low quality.
 
 {{
