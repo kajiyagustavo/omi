@@ -145,9 +145,10 @@ def get_memories(
     source: Optional[str] = None,
     uid: str = Depends(auth.get_current_user_uid),
 ):
-    # Use high limits for the first page
-    # Warn: should remove
-    if offset == 0:
+    # Paginação real: respeita o `limit` enviado pelo cliente.
+    # (Antes forçava limit=5000 quando offset==0, o que impedia paginar.)
+    # Guarda de segurança contra limites absurdos.
+    if limit > 5000:
         limit = 5000
     memories = memories_db.get_memories(uid, limit, offset)
 

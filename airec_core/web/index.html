@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Omi — Segundo Cérebro</title>
+<style>
+  :root { --bg:#0d0d12; --card:#17171f; --card2:#1e1e29; --txt:#e8e8ef; --mut:#8a8a9a; --acc:#7c5cff; --acc2:#9b82ff; --ok:#3ddc84; --br:#2a2a38; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--txt); height:100vh; overflow:hidden; }
+  #login { display:flex; align-items:center; justify-content:center; height:100vh; flex-direction:column; gap:20px; }
+  #login h1 { font-size:28px; font-weight:700; }
+  #login p { color:var(--mut); }
+  button { cursor:pointer; border:none; border-radius:10px; font-size:14px; font-weight:600; transition:.15s; }
+  .gbtn { background:var(--acc); color:#fff; padding:12px 24px; font-size:15px; }
+  .gbtn:hover { background:var(--acc2); }
+  #app { display:none; height:100vh; flex-direction:column; }
+  header { display:flex; align-items:center; gap:12px; padding:12px 18px; border-bottom:1px solid var(--br); background:var(--card); }
+  header .logo { font-weight:700; font-size:18px; }
+  header .logo span { color:var(--acc2); }
+  header .who { margin-left:auto; color:var(--mut); font-size:13px; }
+  header .logout { background:var(--card2); color:var(--mut); padding:6px 12px; font-size:12px; }
+  nav { display:flex; gap:6px; padding:10px 16px; border-bottom:1px solid var(--br); background:var(--card); overflow-x:auto; }
+  nav button { background:transparent; color:var(--mut); padding:8px 16px; border-radius:9px; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; }
+  nav button:hover { background:var(--card2); color:var(--txt); }
+  nav button.active { background:var(--acc); color:#fff; }
+  main { flex:1; overflow-y:auto; padding:24px 16px; }
+  .wrap { max-width:780px; margin:0 auto; }
+  .count { color:var(--mut); font-size:13px; margin-bottom:14px; }
+  .item { background:var(--card); border:1px solid var(--br); border-radius:14px; padding:16px 18px; margin-bottom:12px; }
+  .item .head { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:11px; color:var(--acc2); text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+  .item .body { font-size:14px; line-height:1.55; }
+  .item .date { font-size:11px; color:var(--mut); margin-top:10px; }
+  .task { display:flex; gap:12px; align-items:flex-start; cursor:pointer; transition:.12s; }
+  .task:hover { border-color:var(--acc); background:var(--card2); }
+  .task .dot { width:22px; height:22px; border:2px solid var(--mut); border-radius:50%; margin-top:0; flex-shrink:0; transition:.15s; display:flex; align-items:center; justify-content:center; font-size:13px; color:transparent; }
+  .task:hover .dot { border-color:var(--acc2); }
+  .task.done { cursor:pointer; }
+  .task.done:hover { background:var(--card); }
+  .task.done .dot { background:var(--ok); border-color:var(--ok); color:#0d0d12; }
+  .task.done .body { color:var(--mut); text-decoration:line-through; }
+  .task .body { padding-top:1px; }
+  .task.pending-busy { opacity:.5; pointer-events:none; }
+  /* agenda / calendário */
+  .daygroup { margin-bottom:18px; }
+  .dayhead { display:flex; align-items:baseline; gap:8px; margin:0 2px 8px; padding-bottom:6px; border-bottom:1px solid var(--br); }
+  .dayhead .d-label { font-size:14px; font-weight:700; color:var(--txt); }
+  .dayhead .d-label.today { color:var(--acc2); }
+  .dayhead .d-label.overdue { color:#ff6b6b; }
+  .dayhead .d-count { font-size:12px; color:var(--mut); margin-left:auto; }
+  .sectionhead { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--mut); margin:24px 2px 12px; display:flex; align-items:center; gap:8px; }
+  .sectionhead.done-toggle { cursor:pointer; }
+  .sectionhead .chev { transition:.15s; }
+  .sectionhead.collapsed .chev { transform:rotate(-90deg); }
+  .task .due { font-size:11px; color:var(--mut); margin-top:4px; }
+  .task .due.overdue { color:#ff6b6b; }
+  .loading,.empty { text-align:center; color:var(--mut); padding:40px; }
+  /* chat */
+  #chatview { display:none; flex-direction:column; height:100%; }
+  #chatlog { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .msg { max-width:80%; padding:12px 16px; border-radius:14px; font-size:14px; line-height:1.55; white-space:pre-wrap; }
+  .msg.user { align-self:flex-end; background:var(--acc); color:#fff; }
+  .msg.ai { align-self:flex-start; background:var(--card2); border:1px solid var(--br); }
+  #chatbar { display:flex; gap:8px; padding:12px; border-top:1px solid var(--br); background:var(--card); }
+  #chatinput { flex:1; background:var(--card2); border:1px solid var(--br); border-radius:10px; color:var(--txt); padding:12px 14px; font-size:14px; outline:none; }
+  #sendbtn { background:var(--acc); color:#fff; padding:0 20px; }
+  .search { width:100%; background:var(--card2); border:1px solid var(--br); border-radius:10px; color:var(--txt); padding:11px 14px; font-size:14px; outline:none; margin-bottom:12px; }
+  .search:focus { border-color:var(--acc); }
+  .item.mem { cursor:pointer; transition:.12s; }
+  .item.mem:hover { border-color:var(--acc); background:var(--card2); }
+  /* filtros (pills) */
+  .filters { display:flex; gap:7px; flex-wrap:wrap; margin-bottom:14px; }
+  .pill { background:var(--card2); border:1px solid var(--br); color:var(--mut); padding:6px 13px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; transition:.12s; }
+  .pill:hover { color:var(--txt); border-color:var(--acc2); }
+  .pill.on { background:var(--acc); border-color:var(--acc); color:#fff; }
+  /* Stargate */
+  .stg-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:14px; }
+  .stg-card { background:var(--card); border:1px solid var(--br); border-radius:14px; padding:16px; cursor:pointer; transition:.15s; }
+  .stg-card:hover { border-color:var(--acc); background:var(--card2); transform:translateY(-2px); }
+  .stg-ic { font-size:26px; }
+  .stg-tt { font-weight:700; font-size:15px; margin:8px 0 4px; }
+  .stg-ds { color:var(--mut); font-size:12.5px; line-height:1.45; }
+  .stg-meta { color:var(--acc2); font-size:11.5px; margin-top:10px; }
+  .stg-stats { display:flex; gap:12px; margin-bottom:14px; }
+  .stg-stat { background:var(--card); border:1px solid var(--br); border-radius:12px; padding:12px 18px; text-align:center; }
+  .stg-stat b { display:block; font-size:22px; color:var(--acc2); }
+  .stg-stat span { color:var(--mut); font-size:11.5px; }
+  .stg-run-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:18px; }
+  .stg-back { color:var(--mut); cursor:pointer; font-size:13px; }
+  .stg-back:hover { color:var(--txt); }
+  .stg-run-title { font-weight:700; }
+  .stg-prog { color:var(--mut); font-size:13px; }
+  .stg-warn { background:rgba(255,180,0,.08); border:1px solid rgba(255,180,0,.3); color:#ffd27c; padding:12px 14px; border-radius:10px; font-size:12.5px; line-height:1.5; margin-bottom:16px; }
+  .stg-step { background:var(--card); border:1px solid var(--br); border-radius:16px; padding:24px; }
+  .stg-step-t { font-size:19px; font-weight:700; margin-bottom:10px; }
+  .stg-step-x { color:var(--txt); font-size:15px; line-height:1.6; opacity:.92; }
+  .stg-timer { font-size:44px; font-weight:700; text-align:center; margin:20px 0; color:var(--acc2); font-variant-numeric:tabular-nums; }
+  .stg-timer.done { color:var(--ok); }
+  .stg-conf { margin-top:18px; display:flex; align-items:center; gap:12px; }
+  .stg-conf input { flex:1; }
+  .stg-text { width:100%; margin-top:16px; background:var(--card2); border:1px solid var(--br); border-radius:10px; color:var(--txt); padding:12px; font-size:14px; min-height:80px; resize:vertical; font-family:inherit; }
+  .stg-actions { display:flex; gap:12px; margin-top:22px; }
+  .stg-btn2 { background:var(--card2); border:1px solid var(--br); color:var(--txt); padding:12px 22px; }
+  .stg-btn2:hover { background:var(--br); }
+  .stg-done { text-align:center; padding:30px 20px; }
+  .stg-preview { background:var(--card2); border:1px solid var(--br); border-radius:10px; padding:16px; text-align:left; white-space:pre-wrap; font-size:13.5px; color:var(--txt); }
+  .stg-dcheck { display:flex; align-items:center; gap:9px; padding:7px 4px; font-size:14px; cursor:pointer; border-bottom:1px solid var(--br); white-space:normal; }
+  .stg-dcheck:last-child { border-bottom:none; }
+  .stg-dcheck input { width:17px; height:17px; accent-color:var(--acc); flex:none; }
+  /* paginação */
+  .pager { display:flex; align-items:center; justify-content:center; gap:14px; margin:18px 0 6px; }
+  .pager button { background:var(--card2); border:1px solid var(--br); color:var(--txt); padding:9px 18px; border-radius:10px; font-size:13px; }
+  .pager button:hover:not(:disabled) { background:var(--acc); border-color:var(--acc); }
+  .pager button:disabled { opacity:.35; cursor:default; }
+  .pager .pinfo { color:var(--mut); font-size:13px; min-width:120px; text-align:center; }
+  #modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:100; padding:20px; }
+  #modalcard { background:var(--card); border:1px solid var(--br); border-radius:16px; max-width:640px; width:100%; max-height:80vh; overflow-y:auto; padding:24px; }
+  #modalcard .mh { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
+  #modalcat { font-size:11px; color:var(--acc2); text-transform:uppercase; letter-spacing:.5px; }
+  #modaldate { font-size:12px; color:var(--mut); margin-left:auto; }
+  #modalbody { font-size:16px; line-height:1.6; white-space:pre-wrap; }
+  #modalclose { margin-top:20px; background:var(--card2); color:var(--mut); padding:10px 18px; border-radius:8px; }
+  /* badge de origem da memória */
+  .src { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; padding:2px 7px; border-radius:6px; margin-left:8px; }
+  .src.conv { background:rgba(124,92,255,.18); color:var(--acc2); }
+  .src.manual { background:rgba(61,220,132,.15); color:var(--ok); }
+  .src.app { background:rgba(255,180,60,.15); color:#ffb43c; }
+  .src.system { background:rgba(138,138,154,.15); color:var(--mut); }
+  .item .head { display:flex; align-items:center; flex-wrap:wrap; }
+  .item.mem .body.linkconv { cursor:pointer; }
+  /* barra de ação (criar tarefa) */
+  .actionbar { display:flex; gap:8px; margin-bottom:14px; }
+  .actionbar input { flex:1; background:var(--card2); border:1px solid var(--br); border-radius:10px; color:var(--txt); padding:11px 14px; font-size:14px; outline:none; }
+  .actionbar input:focus { border-color:var(--acc); }
+  .actionbar .addbtn { background:var(--acc); color:#fff; padding:0 18px; white-space:nowrap; }
+  .actionbar .addbtn:hover { background:var(--acc2); }
+  .clearbtn { background:var(--card2); color:var(--mut); border:1px solid var(--br); padding:8px 14px; border-radius:8px; font-size:12px; margin-left:auto; }
+  .clearbtn:hover { color:#ff6b6b; border-color:#ff6b6b; }
+  .taskhead { display:flex; align-items:center; margin-bottom:12px; }
+  /* gerenciador de tarefas */
+  .task { position:relative; }
+  .task .tbody { flex:1; min-width:0; }
+  .task .tmeta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .prio { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; padding:2px 8px; border-radius:6px; }
+  .prio.high { background:rgba(255,107,107,.16); color:#ff6b6b; }
+  .prio.medium { background:rgba(255,180,60,.16); color:#ffb43c; }
+  .prio.low { background:rgba(138,138,154,.16); color:var(--mut); }
+  .task .pbar { position:absolute; left:0; top:0; bottom:0; width:3px; border-radius:14px 0 0 14px; }
+  .task .pbar.high { background:#ff6b6b; } .task .pbar.medium { background:#ffb43c; } .task .pbar.low { background:var(--mut); }
+  .tactions { display:flex; gap:4px; margin-left:auto; flex-shrink:0; opacity:0; transition:.12s; }
+  .task:hover .tactions { opacity:1; }
+  .tactions button { background:var(--card2); border:1px solid var(--br); color:var(--mut); width:28px; height:28px; border-radius:7px; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .tactions button:hover { color:var(--txt); border-color:var(--acc2); }
+  .subtasks { margin-left:34px; margin-top:8px; padding-left:12px; border-left:2px solid var(--br); }
+  .subtasks .task { margin-bottom:8px; }
+  /* editor de tarefa (modal) */
+  #taskedit, #eventedit { display:none; position:fixed; inset:0; background:rgba(0,0,0,.6); align-items:center; justify-content:center; z-index:110; padding:20px; }
+  #taskeditcard { background:var(--card); border:1px solid var(--br); border-radius:16px; max-width:480px; width:100%; padding:22px; }
+  #taskeditcard h3 { font-size:15px; margin-bottom:16px; }
+  .fld { margin-bottom:14px; }
+  .fld label { display:block; font-size:12px; color:var(--mut); margin-bottom:6px; font-weight:600; }
+  .fld input, .fld textarea { width:100%; background:var(--card2); border:1px solid var(--br); border-radius:9px; color:var(--txt); padding:10px 12px; font-size:14px; outline:none; font-family:inherit; }
+  .fld input:focus, .fld textarea:focus { border-color:var(--acc); }
+  .fld .row { display:flex; gap:10px; }
+  .fld .row > * { flex:1; }
+  .prio-pick { display:flex; gap:7px; }
+  .prio-pick .pp { flex:1; text-align:center; background:var(--card2); border:1px solid var(--br); color:var(--mut); padding:8px; border-radius:8px; cursor:pointer; font-size:12px; font-weight:600; }
+  .prio-pick .pp.on.high { background:rgba(255,107,107,.2); border-color:#ff6b6b; color:#ff6b6b; }
+  .prio-pick .pp.on.medium { background:rgba(255,180,60,.2); border-color:#ffb43c; color:#ffb43c; }
+  .prio-pick .pp.on.low { background:rgba(138,138,154,.2); border-color:var(--mut); color:var(--txt); }
+  .prio-pick .pp.on.none { background:var(--card2); border-color:var(--acc2); color:var(--txt); }
+  .editbtns { display:flex; gap:8px; margin-top:18px; }
+  .editbtns .save { background:var(--acc); color:#fff; flex:1; padding:11px; }
+  .editbtns .save:hover { background:var(--acc2); }
+  .editbtns .cancel { background:var(--card2); color:var(--mut); border:1px solid var(--br); padding:11px 18px; }
+  /* link pra conversa */
+  .convlink { font-size:11px; color:var(--acc2); cursor:pointer; margin-top:6px; display:inline-block; }
+  .convlink:hover { text-decoration:underline; }
+  /* jornal — layout 2 colunas: calendário à esquerda, relatório à direita */
+  .journal-layout { display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:start; max-width:1100px; margin:0 auto; }
+  .journal-left { position:sticky; top:0; }
+  .cal { background:var(--card); border:1px solid var(--br); border-radius:14px; padding:12px; }
+  .cal-nav { display:flex; align-items:center; gap:6px; margin-bottom:8px; }
+  .cal-nav button { background:var(--card2); color:var(--txt); width:26px; height:26px; border-radius:7px; font-size:14px; }
+  .cal-nav button:hover { background:var(--acc); }
+  .cal-nav .cal-title { font-weight:700; font-size:13px; flex:1; text-align:center; text-transform:capitalize; }
+  .cal-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:2px; }
+  .cal-dow { text-align:center; font-size:9px; color:var(--mut); text-transform:uppercase; padding:2px 0; }
+  .cal-day { height:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; border-radius:6px; font-size:12px; cursor:pointer; position:relative; color:var(--txt); transition:.12s; }
+  .cal-day.empty { cursor:default; }
+  .cal-day.has:hover { background:var(--card2); }
+  .cal-day.sel { background:var(--acc); color:#fff; font-weight:700; }
+  .cal-day .pip { width:4px; height:4px; border-radius:50%; background:var(--acc2); position:absolute; bottom:3px; }
+  .cal-day.sel .pip { background:#fff; }
+  .cal-day.today { border:1px solid var(--acc2); }
+  .journal-right { min-width:0; }
+  .journal-day-title { font-size:17px; font-weight:700; margin:0 0 14px; text-transform:capitalize; }
+  .journal-sec { margin-bottom:20px; }
+  .journal-sec h3 { font-size:13px; text-transform:uppercase; letter-spacing:.5px; color:var(--mut); margin-bottom:10px; display:flex; align-items:center; gap:6px; }
+  .journal-summary { background:linear-gradient(135deg,rgba(124,92,255,.12),rgba(155,130,255,.06)); border:1px solid rgba(124,92,255,.3); border-radius:14px; padding:16px; margin-bottom:18px; font-size:14px; line-height:1.6; white-space:pre-wrap; }
+  .journal-summary .ld { color:var(--mut); }
+  .journal-summary.native { white-space:normal; }
+  .ns-head { font-size:16px; margin-bottom:8px; }
+  .ns-over { font-size:14px; line-height:1.6; margin-bottom:8px; }
+  .ns-stats { font-size:12px; color:var(--mut); margin-bottom:6px; }
+  .ns-sec { margin-top:12px; }
+  .ns-sec h4 { font-size:12px; text-transform:uppercase; letter-spacing:.4px; color:var(--acc2); margin-bottom:6px; }
+  .ns-item { font-size:13px; line-height:1.5; padding:3px 0; border-radius:6px; }
+  .ns-item:hover { color:var(--txt); }
+  .ns-item .convlink { font-size:11px; }
+  .ns-foot { margin-top:12px; font-size:11px; color:var(--mut); font-style:italic; }
+  @media (max-width:760px){ .journal-layout { grid-template-columns:1fr; } .journal-left { position:static; } }
+  /* agenda / google calendar */
+  .ag-connect { text-align:center; padding:48px 20px; }
+  .ag-connect .ic { font-size:42px; margin-bottom:14px; }
+  .ag-connect h3 { font-size:18px; margin-bottom:8px; }
+  .ag-connect p { color:var(--mut); font-size:14px; margin-bottom:20px; }
+  .ag-connect .gcbtn { background:var(--acc); color:#fff; padding:12px 24px; font-size:14px; display:inline-flex; align-items:center; gap:8px; }
+  .ag-connect .gcbtn:hover { background:var(--acc2); }
+  .ev { display:flex; gap:14px; background:var(--card); border:1px solid var(--br); border-radius:14px; padding:14px 16px; margin-bottom:10px; }
+  .ev .when { flex-shrink:0; text-align:center; min-width:54px; }
+  .ev .when .d { font-size:20px; font-weight:700; line-height:1; }
+  .ev .when .m { font-size:11px; color:var(--mut); text-transform:uppercase; }
+  .ev .when .h { font-size:12px; color:var(--acc2); margin-top:4px; }
+  .ev .info { flex:1; min-width:0; }
+  .ev .info .t { font-size:14px; font-weight:600; }
+  .ev .info .loc { font-size:12px; color:var(--mut); margin-top:3px; }
+  .ev.allday .when .h { color:var(--mut); }
+  .ag-daygroup { margin-bottom:18px; }
+  .ag-dayhead { font-size:13px; font-weight:700; color:var(--acc2); margin:0 2px 8px; padding-bottom:6px; border-bottom:1px solid var(--br); text-transform:capitalize; }
+</style>
+</head>
+<body>
+  <div id="login">
+    <h1>Omi · <span style="color:#9b82ff">Segundo Cérebro</span></h1>
+    <p>Suas memórias, tarefas e chat — na sua infraestrutura.</p>
+    <button class="gbtn" onclick="doLogin()">Entrar com Google</button>
+    <p id="loginerr" style="color:#ff6b6b;font-size:13px"></p>
+  </div>
+
+  <div id="app">
+    <header>
+      <div class="logo">Omi<span>·</span></div>
+      <div class="who" id="who"></div>
+      <button class="logout" onclick="doLogout()">Sair</button>
+    </header>
+    <nav>
+      <button data-tab="memories" class="active" onclick="switchTab('memories')">🧠 Memórias</button>
+      <button data-tab="tasks" onclick="switchTab('tasks')">✓ Tarefas</button>
+      <button data-tab="agenda" onclick="switchTab('agenda')">📆 Agenda</button>
+      <button data-tab="journal" onclick="switchTab('journal')">📅 Jornal</button>
+      <button data-tab="convos" onclick="switchTab('convos')">💬 Conversas</button>
+      <button data-tab="chat" onclick="switchTab('chat')">✨ Perguntar</button>
+      <button data-tab="stargate" onclick="switchTab('stargate')">🌌 Stargate</button>
+    </nav>
+    <main id="main"></main>
+    <div id="chatview">
+      <div id="chatlog"></div>
+      <div id="chatbar">
+        <input id="chatinput" placeholder="Pergunte qualquer coisa sobre sua vida..." onkeydown="if(event.key==='Enter')sendChat()">
+        <button id="sendbtn" onclick="sendChat()">Enviar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal" onclick="if(event.target===this)closeMem()">
+    <div id="modalcard">
+      <div class="mh"><span id="modalcat"></span><span id="modaldate"></span></div>
+      <div id="modalbody"></div>
+      <div id="modalextra" style="margin-top:12px"></div>
+      <button id="modalclose" onclick="closeMem()">Fechar</button>
+    </div>
+  </div>
+
+  <div id="taskedit" onclick="if(event.target===this)closeTaskEdit()">
+    <div id="taskeditcard">
+      <h3 id="taskedit-title">Editar tarefa</h3>
+      <div class="fld"><label>Descrição</label><textarea id="te-desc" rows="2"></textarea></div>
+      <div class="fld"><div class="row">
+        <div><label>Dia</label><input type="date" id="te-date"></div>
+        <div><label>Horário</label><input type="time" id="te-time"></div>
+      </div></div>
+      <div class="fld"><label>Prioridade</label>
+        <div class="prio-pick" id="te-prio">
+          <span class="pp none" data-p="" onclick="pickPrio('')">—</span>
+          <span class="pp low" data-p="low" onclick="pickPrio('low')">Baixa</span>
+          <span class="pp medium" data-p="medium" onclick="pickPrio('medium')">Média</span>
+          <span class="pp high" data-p="high" onclick="pickPrio('high')">Alta</span>
+        </div>
+      </div>
+      <div class="editbtns">
+        <button class="save" onclick="saveTaskEdit()">Salvar</button>
+        <button class="cancel" onclick="closeTaskEdit()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="eventedit" onclick="if(event.target===this)closeEventEdit()">
+    <div id="taskeditcard">
+      <h3>Novo evento</h3>
+      <div class="fld"><label>Título</label><input id="ev-summary" placeholder="Ex: Reunião com fornecedor"></div>
+      <div class="fld"><div class="row">
+        <div><label>Dia</label><input type="date" id="ev-date"></div>
+        <div><label>Início</label><input type="time" id="ev-start"></div>
+        <div><label>Fim</label><input type="time" id="ev-end"></div>
+      </div></div>
+      <div class="fld"><label>Local (opcional)</label><input id="ev-loc"></div>
+      <div class="editbtns">
+        <button class="save" onclick="saveEvent()">Criar evento</button>
+        <button class="cancel" onclick="closeEventEdit()">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAcDii-RIJWTpfO9SdD1YYnCAEtzcETHWY",
+  authDomain: "airec-omi.firebaseapp.com",
+  projectId: "airec-omi",
+  appId: "1:675812370795:web:244b2ab25549909f61442e",
+  messagingSenderId: "675812370795",
+};
+const API = "https://omi.elevare.club";
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+let idToken = null;
+
+window.doLogin = async () => {
+  try {
+    await signInWithPopup(auth, new GoogleAuthProvider());
+  } catch (e) {
+    document.getElementById('loginerr').textContent = e.message;
+  }
+};
+window.doLogout = () => signOut(auth);
+
+// atalho: tecla "N" foca o campo de nova tarefa (na aba Tarefas), Esc fecha modais
+document.addEventListener('keydown', (e) => {
+  const typing = ['INPUT','TEXTAREA'].includes(document.activeElement?.tagName);
+  if (e.key==='Escape'){ closeTaskEdit?.(); closeMem?.(); return; }
+  if ((e.key==='n'||e.key==='N') && !typing){
+    const inp = document.getElementById('newtask');
+    if (inp){ e.preventDefault(); inp.focus(); }
+  }
+});
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    idToken = await user.getIdToken();
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('who').textContent = user.email;
+    // volta do OAuth do Google Calendar → abre direto a Agenda
+    const justConnected = new URLSearchParams(location.search).get('calendar') === 'connected';
+    switchTab(justConnected ? 'agenda' : 'memories');
+    if (justConnected) history.replaceState({}, '', location.pathname);   // limpa o ?calendar
+  } else {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login').style.display = 'flex';
+  }
+});
+
+async function api(path, opts={}) {
+  idToken = await auth.currentUser.getIdToken();
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: { 'Authorization': 'Bearer ' + idToken, 'Content-Type':'application/json', ...(opts.headers||{}) },
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  return r;
+}
+
+function esc(s){ return (s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+function fmtDate(d){ if(!d)return''; try{return new Date(d).toLocaleString('pt-BR',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});}catch{return''} }
+
+window.switchTab = (tab) => {
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  const main = document.getElementById('main'), chat = document.getElementById('chatview');
+  if (tab==='chat'){ main.style.display='none'; chat.style.display='flex'; loadChat(); return; }
+  chat.style.display='none'; main.style.display='block';
+  main.innerHTML = '<div class="loading">Carregando…</div>';
+  if (tab==='memories') loadMemories();
+  if (tab==='tasks') loadTasks();
+  if (tab==='agenda') loadAgenda();
+  if (tab==='journal') loadJournal();
+  if (tab==='convos') loadConvos();
+  if (tab==='stargate') loadStargate();
+};
+
+let allMemories = [];
+const MEM_PER_PAGE = 50;
+let memPage = 0;
+let memQuery = '';
+let memFilter = 'all';   // all | conv | manual
+
+let memLoading = false;      // busca de fundo em andamento
+async function loadMemories(){
+  try {
+    if (allMemories.length){ renderMemories(); return; }
+    // Render progressivo: busca em blocos e mostra a página 1 assim que o 1º lote chega,
+    // sem esperar todas as memórias. Os blocos seguintes chegam em segundo plano e a
+    // busca passa a cobrir tudo conforme carrega.
+    memLoading = true;
+    const CHUNK = 500;
+    let offset = 0, first = true;
+    while (true){
+      let batch;
+      try {
+        batch = await (await api(`/v3/memories?limit=${CHUNK}&offset=${offset}`)).json();
+      } catch(e){
+        // fallback: backend sem offset → busca tudo de uma vez (comportamento antigo)
+        if (first){ batch = await (await api('/v3/memories?limit=5000')).json(); }
+        else break;
+      }
+      if (!Array.isArray(batch) || !batch.length) break;
+      allMemories = allMemories.concat(batch);
+      allMemories.sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
+      if (first){ renderMemories(); first = false; }   // pinta a p.1 já no 1º lote
+      else if (document.querySelector('nav button.active')?.dataset.tab==='memories'){ renderMemories(); }
+      if (batch.length < CHUNK) break;   // último lote
+      offset += CHUNK;
+    }
+    memLoading = false;
+    if (first) renderMemories();   // caso não tenha vindo nada
+  } catch(e){ memLoading=false; document.getElementById('main').innerHTML = `<div class="empty">Erro: ${e.message}</div>`; }
+}
+
+function memFiltered(){
+  let f = allMemories;
+  if (memFilter==='conv') f = f.filter(m=>!m.manually_added && m.conversation_id);
+  else if (memFilter==='manual') f = f.filter(m=>m.manually_added);
+  if (memQuery){ const q=memQuery.toLowerCase(); f = f.filter(m=>(m.content||'').toLowerCase().includes(q)); }
+  return f;
+}
+// origem real da memória (não a category): app > conversa(áudio) > manual > sistema
+function memSource(m){
+  if (m.app_id) return {cls:'app', label:'App', icon:'🧩'};
+  if (m.manually_added) return {cls:'manual', label:'Manual', icon:'✍️'};
+  if (m.conversation_id) return {cls:'conv', label:'Conversa', icon:'🎙️'};
+  return {cls:'system', label:'Sistema', icon:'⚙️'};
+}
+function memCard(m){
+  const idx = allMemories.indexOf(m);
+  const s = memSource(m);
+  return `<div class="item mem" onclick="openMem(${idx})">`
+       + `<div class="head">${esc(m.category||'')}<span class="src ${s.cls}">${s.icon} ${s.label}</span></div>`
+       + `<div class="body">${esc(m.content)}</div>`
+       + `<div class="date">${fmtDate(m.created_at)}</div></div>`;
+}
+window.openMem = (idx) => {
+  const m = allMemories[idx]; if(!m) return;
+  const s = memSource(m);
+  document.getElementById('modalcat').innerHTML = esc(m.category||'') + ` <span class="src ${s.cls}">${s.icon} ${s.label}</span>`;
+  document.getElementById('modaldate').textContent = fmtDate(m.created_at);
+  let body = m.content||'';
+  document.getElementById('modalbody').textContent = body;
+  // link pra conversa-fonte (se veio de áudio)
+  const extra = document.getElementById('modalextra');
+  if (m.conversation_id && !m.manually_added){
+    extra.innerHTML = `<span class="convlink" onclick="openConvo('${m.conversation_id}')">🎙️ Abrir conversa que gerou esta memória →</span>`;
+  } else { extra.innerHTML = ''; }
+  document.getElementById('modal').style.display = 'flex';
+};
+window.closeMem = () => { document.getElementById('modal').style.display = 'none'; };
+
+// abre uma conversa no modal (usado por memórias e pelo jornal)
+window.openConvo = async (cid) => {
+  document.getElementById('modalcat').innerHTML = '🎙️ Conversa';
+  document.getElementById('modaldate').textContent = '';
+  document.getElementById('modalbody').textContent = 'Carregando conversa…';
+  document.getElementById('modalextra').innerHTML = '';
+  document.getElementById('modal').style.display = 'flex';
+  try {
+    const c = await (await api(`/v1/conversations/${cid}`)).json();
+    const t = c.structured||{};
+    document.getElementById('modalcat').innerHTML = esc(t.category||c.source||'Conversa');
+    document.getElementById('modaldate').textContent = fmtDate(c.created_at);
+    let body = `${t.title||'(sem título)'}\n\n${t.overview||''}`;
+    if (Array.isArray(t.action_items) && t.action_items.length){
+      body += '\n\n— Tarefas —\n' + t.action_items.map(a=>'• '+(a.description||a.content||a)).join('\n');
+    }
+    // transcrição (segmentos), se vier
+    if (Array.isArray(c.transcript_segments) && c.transcript_segments.length){
+      const tx = c.transcript_segments.map(s=>s.text).join(' ').trim();
+      if (tx) body += '\n\n— Transcrição —\n' + tx;
+    }
+    document.getElementById('modalbody').textContent = body;
+  } catch(e){
+    document.getElementById('modalbody').textContent = 'Erro ao abrir conversa: ' + e.message;
+  }
+};
+function renderMemories(){
+  const main = document.getElementById('main');
+  const f = memFiltered();
+  const pages = Math.max(1, Math.ceil(f.length / MEM_PER_PAGE));
+  if (memPage >= pages) memPage = pages-1;
+  if (memPage < 0) memPage = 0;
+  const start = memPage * MEM_PER_PAGE;
+  const slice = f.slice(start, start + MEM_PER_PAGE);
+
+  const pill = (id,lbl) => `<span class="pill ${memFilter===id?'on':''}" onclick="setMemFilter('${id}')">${lbl}</span>`;
+  let html = `<div class="wrap">`;
+  html += `<input class="search" placeholder="Buscar nas ${allMemories.length} memórias..." value="${esc(memQuery)}" oninput="setMemQuery(this.value)">`;
+  html += `<div class="filters">${pill('all','Todas')}${pill('conv','🎙️ Conversa')}${pill('manual','✍️ Manual')}</div>`;
+  html += `<div class="count">${f.length} memória(s) · página ${memPage+1} de ${pages}</div>`;
+  for (const m of slice){ html += memCard(m); }
+  html += pager(memPage, pages, 'gotoMemPage');
+  html += `</div>`;
+  main.innerHTML = html;
+}
+function pager(page, pages, fn){
+  if (pages<=1) return '';
+  return `<div class="pager">`
+       + `<button onclick="${fn}(${page-1})" ${page<=0?'disabled':''}>‹ Anterior</button>`
+       + `<span class="pinfo">${page+1} / ${pages}</span>`
+       + `<button onclick="${fn}(${page+1})" ${page>=pages-1?'disabled':''}>Próxima ›</button></div>`;
+}
+window.gotoMemPage = (p) => { memPage = p; renderMemories(); document.getElementById('main').scrollTop=0; };
+window.setMemFilter = (id) => { memFilter = id; memPage = 0; renderMemories(); };
+let memSearchTimer = null;
+window.setMemQuery = (q) => {
+  memQuery = q; memPage = 0;
+  clearTimeout(memSearchTimer);
+  memSearchTimer = setTimeout(()=>{ renderMemories(); const s=document.querySelector('.search'); if(s){ s.focus(); s.setSelectionRange(s.value.length,s.value.length); } }, 200);
+};
+
+let allTasks = [];
+let doneCollapsed = true;
+
+// chave do dia (YYYY-MM-DD local) e rótulo amigável Hoje/Amanhã/Ontem/data
+function dayKey(d){ const x=new Date(d); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`; }
+function dayLabel(key){
+  const today = dayKey(new Date());
+  const t = new Date(); const tomorrow = dayKey(new Date(t.getFullYear(),t.getMonth(),t.getDate()+1));
+  const yesterday = dayKey(new Date(t.getFullYear(),t.getMonth(),t.getDate()-1));
+  if (key===today) return {txt:'Hoje', cls:'today'};
+  if (key===tomorrow) return {txt:'Amanhã', cls:''};
+  if (key===yesterday) return {txt:'Ontem', cls:'overdue'};
+  const [y,m,dd]=key.split('-').map(Number);
+  const dt=new Date(y,m-1,dd);
+  const cls = key<today ? 'overdue':'';
+  return {txt: dt.toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'short'}), cls};
+}
+function taskTxt(t){ return t.description||t.text||t.content||''; }
+
+async function loadTasks(){
+  try {
+    const data = await (await api('/v1/action-items?limit=500')).json();
+    allTasks = Array.isArray(data) ? data : (data.action_items||data.items||[]);
+    renderTasks();
+  } catch(e){ document.getElementById('main').innerHTML = `<div class="empty">Erro: ${e.message}</div>`; }
+}
+
+const PRIO_ORDER = { high:0, medium:1, low:2 };
+function subtasksOf(id){ return allTasks.filter(t=>t.parent_id===id); }
+
+function renderTasks(){
+  const main = document.getElementById('main');
+  // tarefas-raiz (sem parent) — subtarefas são renderizadas aninhadas
+  const roots = allTasks.filter(t=>!t.parent_id);
+  const pending = roots.filter(t=>!(t.completed||t.is_completed));
+  const done = roots.filter(t=>t.completed||t.is_completed);
+  const totalPend = allTasks.filter(t=>!(t.completed||t.is_completed)).length;
+  const totalDone = allTasks.filter(t=>t.completed||t.is_completed).length;
+
+  // agrupa pendentes por dia (due_at se houver; senão created_at; senão "sem data")
+  const groups = {};
+  for (const t of pending){
+    const ref = t.due_at || t.created_at;
+    const key = ref ? dayKey(ref) : 'sem-data';
+    (groups[key] = groups[key] || []).push(t);
+  }
+  // dentro do dia: ordena por prioridade depois por hora
+  for (const k in groups){
+    groups[k].sort((a,b)=>{
+      const pa=PRIO_ORDER[a.priority]??3, pb=PRIO_ORDER[b.priority]??3;
+      if (pa!==pb) return pa-pb;
+      return new Date(a.due_at||a.created_at||0)-new Date(b.due_at||b.created_at||0);
+    });
+  }
+  const keys = Object.keys(groups).sort((a,b)=>{ if(a==='sem-data')return 1; if(b==='sem-data')return -1; return a<b?-1:1; });
+
+  let html = `<div class="wrap">`;
+  html += `<div class="actionbar">`
+           + `<input id="newtask" placeholder="Nova tarefa…  (atalho: tecla N)" onkeydown="if(event.key==='Enter')addTask()">`
+           + `<button class="addbtn" onclick="addTask()">+ Criar</button></div>`;
+  html += `<div class="taskhead"><div class="count" style="margin:0">${totalPend} pendente(s) · ${totalDone} concluída(s)</div>`;
+  if (pending.length) html += `<button class="clearbtn" onclick="clearAllTasks()">✓ Marcar todas feitas</button>`;
+  html += `</div>`;
+
+  if (!pending.length) html += `<div class="empty">Tudo em dia ✓</div>`;
+  for (const key of keys){
+    const lbl = key==='sem-data' ? {txt:'Sem data', cls:''} : dayLabel(key);
+    html += `<div class="daygroup"><div class="dayhead"><span class="d-label ${lbl.cls}">${lbl.txt}</span><span class="d-count">${groups[key].length}</span></div>`;
+    for (const t of groups[key]) html += taskBlock(t);
+    html += `</div>`;
+  }
+
+  if (done.length){
+    html += `<div class="sectionhead done-toggle ${doneCollapsed?'collapsed':''}" onclick="toggleDoneSection()"><span class="chev">▾</span> Concluídas (${done.length})</div>`;
+    if (!doneCollapsed){
+      const dsorted = done.slice().sort((a,b)=>{ const x=a.completed_at||a.created_at||'', y=b.completed_at||b.created_at||''; return x<y?1:-1; });
+      for (const t of dsorted) html += taskBlock(t);
+    }
+  }
+  html += `</div>`;
+  main.innerHTML = html;
+}
+
+// bloco = tarefa + suas subtarefas aninhadas
+function taskBlock(t){
+  let html = taskRow(t);
+  const subs = subtasksOf(t.id);
+  if (subs.length){
+    subs.sort((a,b)=>(PRIO_ORDER[a.priority]??3)-(PRIO_ORDER[b.priority]??3));
+    html += `<div class="subtasks">`;
+    for (const s of subs) html += taskRow(s, true);
+    html += `</div>`;
+  }
+  return html;
+}
+
+// origem da tarefa (link pro evento que a gerou)
+function taskOrigin(t){
+  if (t.conversation_id) return {icon:'🎙️', label:'Conversa', open:`openConvo('${t.conversation_id}')`};
+  if (t.manually_added===false) return {icon:'🤖', label:'Auto', open:null};
+  return {icon:'✍️', label:'Manual', open:null};
+}
+
+function taskRow(t, isSub){
+  const done = t.completed||t.is_completed;
+  const p = t.priority;
+  let meta = '';
+  if (t.due_at){
+    const overdue = !done && new Date(t.due_at) < new Date();
+    meta += `<span class="due ${overdue?'overdue':''}">⏰ ${fmtDate(t.due_at)}${overdue?' (atrasada)':''}</span>`;
+  }
+  if (p) meta += `<span class="prio ${p}">${p==='high'?'Alta':p==='medium'?'Média':'Baixa'}</span>`;
+  const o = taskOrigin(t);
+  meta += `<span class="src ${t.conversation_id?'conv':'manual'}" ${o.open?`onclick="event.stopPropagation();${o.open}" style="cursor:pointer"`:''}>${o.icon} ${o.label}</span>`;
+  const pbar = p ? `<div class="pbar ${p}"></div>` : '';
+  const acts = `<div class="tactions">`
+             + `<button title="Editar" onclick="event.stopPropagation();openTaskEdit('${t.id}')">✎</button>`
+             + (isSub ? '' : `<button title="Adicionar subtarefa" onclick="event.stopPropagation();addSubtask('${t.id}')">＋</button>`)
+             + `<button title="Excluir" onclick="event.stopPropagation();deleteTask('${t.id}')">🗑</button>`
+             + `</div>`;
+  return `<div class="item task ${done?'done':''}" data-id="${t.id}" onclick="toggleTask('${t.id}', ${!done})" title="${done?'Marcar como pendente':'Marcar como concluída'}">`
+       + pbar
+       + `<div class="dot">✓</div>`
+       + `<div class="tbody"><div class="body">${esc(taskTxt(t))}</div><div class="tmeta">${meta}</div></div>`
+       + acts
+       + `</div>`;
+}
+
+window.toggleDoneSection = () => { doneCollapsed = !doneCollapsed; renderTasks(); };
+
+window.toggleTask = async (id, completed) => {
+  const t = allTasks.find(x=>x.id===id);
+  if (!t) return;
+  const prev = t.completed;
+  t.completed = completed;           // otimista
+  if (completed) t.completed_at = new Date().toISOString();
+  renderTasks();
+  try {
+    await api(`/v1/action-items/${id}/completed?completed=${completed}`, { method:'PATCH' });
+  } catch(e){
+    t.completed = prev;              // rollback
+    renderTasks();
+    alert('Falha ao atualizar tarefa: ' + e.message);
+  }
+};
+
+window.addTask = async () => {
+  const inp = document.getElementById('newtask');
+  const desc = (inp.value||'').trim();
+  if (!desc) return;
+  inp.value = '';
+  inp.disabled = true;
+  try {
+    const r = await api('/v1/action-items', { method:'POST', body: JSON.stringify({ description: desc, completed: false }) });
+    const created = await r.json();
+    allTasks.unshift(created);     // entra no topo (created_at = hoje → grupo "Hoje")
+    renderTasks();
+    setTimeout(()=>{ const n=document.getElementById('newtask'); if(n){n.focus();} },0);
+  } catch(e){
+    alert('Falha ao criar tarefa: ' + e.message);
+    inp.value = desc;
+  } finally {
+    const n=document.getElementById('newtask'); if(n) n.disabled=false;
+  }
+};
+
+window.clearAllTasks = async () => {
+  const pending = allTasks.filter(t=>!(t.completed||t.is_completed));
+  if (!pending.length) return;
+  if (!confirm(`Marcar todas as ${pending.length} tarefas pendentes como feitas?`)) return;
+  // otimista
+  const now = new Date().toISOString();
+  pending.forEach(t=>{ t.completed=true; t.completed_at=now; });
+  renderTasks();
+  // backend em chunks de 100 via sync-batch
+  try {
+    for (let i=0; i<pending.length; i+=100){
+      const chunk = pending.slice(i,i+100);
+      await api('/v1/action-items/sync-batch', { method:'PATCH', body: JSON.stringify({ items: chunk.map(t=>({id:t.id, completed:true})) }) });
+    }
+  } catch(e){ alert('Falha ao marcar em lote: ' + e.message); loadTasks(); }
+};
+
+window.deleteTask = async (id) => {
+  if (!confirm('Excluir esta tarefa?')) return;
+  const subs = subtasksOf(id);
+  allTasks = allTasks.filter(t=>t.id!==id && t.parent_id!==id);   // remove ela + subtarefas
+  renderTasks();
+  try {
+    await api(`/v1/action-items/${id}`, { method:'DELETE' });
+    for (const s of subs) await api(`/v1/action-items/${s.id}`, { method:'DELETE' });
+  } catch(e){ alert('Falha ao excluir: ' + e.message); loadTasks(); }
+};
+
+window.addSubtask = async (parentId) => {
+  const desc = prompt('Nova subtarefa:');
+  if (!desc || !desc.trim()) return;
+  try {
+    const r = await api('/v1/action-items', { method:'POST', body: JSON.stringify({ description: desc.trim(), completed:false, parent_id: parentId }) });
+    const created = await r.json();
+    allTasks.push(created);
+    renderTasks();
+  } catch(e){ alert('Falha ao criar subtarefa: ' + e.message); }
+};
+
+// ===== EDITOR DE TAREFA =====
+let editingTaskId = null;
+let editingPrio = '';
+window.openTaskEdit = (id) => {
+  const t = allTasks.find(x=>x.id===id); if(!t) return;
+  editingTaskId = id;
+  editingPrio = t.priority || '';
+  document.getElementById('te-desc').value = taskTxt(t);
+  // due_at → date + time locais
+  if (t.due_at){
+    const d = new Date(t.due_at);
+    const pad = n=>String(n).padStart(2,'0');
+    document.getElementById('te-date').value = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    document.getElementById('te-time').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } else { document.getElementById('te-date').value=''; document.getElementById('te-time').value=''; }
+  renderPrioPick();
+  document.getElementById('taskedit').style.display = 'flex';
+  setTimeout(()=>document.getElementById('te-desc').focus(),0);
+};
+window.closeTaskEdit = () => { document.getElementById('taskedit').style.display='none'; editingTaskId=null; };
+window.pickPrio = (p) => { editingPrio = p; renderPrioPick(); };
+function renderPrioPick(){
+  document.querySelectorAll('#te-prio .pp').forEach(el=>{
+    el.classList.toggle('on', el.dataset.p===editingPrio);
+  });
+}
+window.saveTaskEdit = async () => {
+  const t = allTasks.find(x=>x.id===editingTaskId); if(!t) return;
+  const desc = document.getElementById('te-desc').value.trim();
+  const date = document.getElementById('te-date').value;
+  const time = document.getElementById('te-time').value;
+  let due_at = null;
+  if (date){ due_at = new Date(`${date}T${time||'09:00'}:00`).toISOString(); }
+  const body = { description: desc, priority: editingPrio || null, due_at };
+  // otimista
+  Object.assign(t, { description:desc, priority:editingPrio||null, due_at });
+  closeTaskEdit(); renderTasks();
+  try {
+    await api(`/v1/action-items/${editingTaskId||t.id}`, { method:'PATCH', body: JSON.stringify(body) });
+  } catch(e){ alert('Falha ao salvar: ' + e.message); loadTasks(); }
+};
+
+async function loadConvos(){
+  try {
+    const data = await (await api('/v1/conversations?limit=100')).json();
+    const main = document.getElementById('main');
+    let html = `<div class="wrap"><div class="count">${data.length} conversas</div>`;
+    for (const c of data){
+      const t = c.structured||{};
+      html += `<div class="item mem" onclick="openConvo('${c.id}')"><div class="head">${esc(t.category||c.source||'')}</div><div class="body"><b>${esc(t.title||'(sem título)')}</b><br>${esc(t.overview||'')}</div><div class="date">${fmtDate(c.created_at)}</div></div>`;
+    }
+    html += `</div>`;
+    main.innerHTML = data.length ? html : '<div class="empty">Nenhuma conversa</div>';
+  } catch(e){ document.getElementById('main').innerHTML = `<div class="empty">Erro: ${e.message}</div>`; }
+}
+
+// ===== AGENDA (Google Calendar) =====
+async function loadAgenda(){
+  const main = document.getElementById('main');
+  try {
+    const st = await (await api('/v1/integrations/google_calendar')).json();
+    if (!st.connected){ renderConnectCalendar(); return; }
+    const data = await (await api('/v1/integrations/google_calendar/events?max_results=30')).json();
+    renderAgenda(data.events||[]);
+  } catch(e){ main.innerHTML = `<div class="wrap"><div class="empty">Erro: ${e.message}</div></div>`; }
+}
+
+function renderConnectCalendar(){
+  document.getElementById('main').innerHTML = `<div class="wrap"><div class="ag-connect">`
+    + `<div class="ic">📆</div><h3>Conecte seu Google Calendar</h3>`
+    + `<p>Veja seus próximos eventos e crie compromissos aqui, sem sair do Omi.</p>`
+    + `<button class="gcbtn" onclick="connectCalendar()">📆 Conectar Google Calendar</button>`
+    + `</div></div>`;
+}
+
+window.connectCalendar = async () => {
+  try {
+    const here = location.origin + location.pathname;   // volta pra esta página
+    const r = await (await api('/v1/integrations/google_calendar/oauth-url?web_redirect=' + encodeURIComponent(here))).json();
+    location.href = r.auth_url;   // navega pro consentimento Google
+  } catch(e){ alert('Falha ao iniciar conexão: ' + e.message); }
+};
+
+function evStart(e){ const s=e.start||{}; return s.dateTime || (s.date ? s.date+'T00:00:00' : null); }
+function renderAgenda(events){
+  const main = document.getElementById('main');
+  let html = `<div class="wrap">`;
+  html += `<div class="taskhead"><div class="count" style="margin:0">${events.length} evento(s) próximos</div>`
+        + `<button class="addbtn" style="padding:8px 16px;border-radius:8px" onclick="openEventEdit()">+ Novo evento</button></div>`;
+  if (!events.length){ html += `<div class="empty">Nenhum evento nos próximos 7 dias.</div>`; }
+  // agrupa por dia
+  const groups = {};
+  for (const e of events){ const s=evStart(e); if(!s)continue; const k=dayKey(s); (groups[k]=groups[k]||[]).push(e); }
+  for (const k of Object.keys(groups).sort()){
+    const lbl = new Date(k+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long'});
+    html += `<div class="ag-daygroup"><div class="ag-dayhead">${lbl}</div>`;
+    for (const e of groups[k]) html += eventRow(e);
+    html += `</div>`;
+  }
+  html += `</div>`;
+  main.innerHTML = html;
+}
+
+function eventRow(e){
+  const s = e.start||{}, allday = !s.dateTime;
+  const dt = new Date(evStart(e));
+  const pad=n=>String(n).padStart(2,'0');
+  const dia = pad(dt.getDate());
+  const mes = dt.toLocaleDateString('pt-BR',{month:'short'}).replace('.','');
+  const hora = allday ? 'dia todo' : `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  const loc = e.location ? `<div class="loc">📍 ${esc(e.location)}</div>` : '';
+  return `<div class="ev ${allday?'allday':''}"><div class="when"><div class="d">${dia}</div><div class="m">${mes}</div><div class="h">${hora}</div></div>`
+       + `<div class="info"><div class="t">${esc(e.summary||'(sem título)')}</div>${loc}</div></div>`;
+}
+
+// criar evento
+window.openEventEdit = () => {
+  const now = new Date(); const pad=n=>String(n).padStart(2,'0');
+  document.getElementById('ev-summary').value='';
+  document.getElementById('ev-date').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  document.getElementById('ev-start').value='09:00';
+  document.getElementById('ev-end').value='10:00';
+  document.getElementById('ev-loc').value='';
+  document.getElementById('eventedit').style.display='flex';
+  setTimeout(()=>document.getElementById('ev-summary').focus(),0);
+};
+window.closeEventEdit = () => { document.getElementById('eventedit').style.display='none'; };
+window.saveEvent = async () => {
+  const summary = document.getElementById('ev-summary').value.trim();
+  const date = document.getElementById('ev-date').value;
+  const start = document.getElementById('ev-start').value || '09:00';
+  const end = document.getElementById('ev-end').value || '10:00';
+  if (!summary || !date){ alert('Preencha título e dia.'); return; }
+  const body = {
+    summary,
+    start_time: new Date(`${date}T${start}:00`).toISOString(),
+    end_time: new Date(`${date}T${end}:00`).toISOString(),
+    location: document.getElementById('ev-loc').value.trim() || null,
+  };
+  try {
+    await api('/v1/integrations/google_calendar/events', { method:'POST', body: JSON.stringify(body) });
+    closeEventEdit();
+    loadAgenda();   // recarrega a lista
+  } catch(e){ alert('Falha ao criar evento: ' + e.message); }
+};
+
+// ===== JORNAL DO DIA (5ª página) =====
+let journalData = null;       // {convos, mems, tasks} indexados por dia
+let calYear, calMonth;        // mês exibido no calendário
+let selectedDay = null;       // YYYY-MM-DD
+const MONTHS = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const DOW = ['D','S','T','Q','Q','S','S'];
+
+async function loadJournal(){
+  const main = document.getElementById('main');
+  if (!journalData){
+    main.innerHTML = '<div class="loading">Carregando jornal…</div>';
+    try {
+      const [convos, mems, tasksR, dailyR] = await Promise.all([
+        (await api('/v1/conversations?limit=300')).json(),
+        (await api('/v3/memories?limit=5000')).json(),
+        (await api('/v1/action-items?limit=500')).json(),
+        (await api('/v1/users/daily-summaries?limit=60')).json().catch(()=>({summaries:[]})),
+      ]);
+      const tasks = Array.isArray(tasksR) ? tasksR : (tasksR.action_items||[]);
+      const byDay = (arr, dateFn) => { const m={}; for(const x of arr){ const d=dateFn(x); if(!d)continue; const k=dayKey(d); (m[k]=m[k]||[]).push(x);} return m; };
+      // resumos NATIVOS do Omi indexados por date (campo já é YYYY-MM-DD); mantém o mais recente por dia
+      const native = {};
+      for (const s of (dailyR.summaries||[])){
+        const k = s.date; if(!k) continue;
+        if (!native[k] || (s.created_at||'') > (native[k].created_at||'')) native[k] = s;
+      }
+      // eventos do Google Calendar (±45 dias) — opcional, se conectado
+      let events = [];
+      try {
+        const start = new Date(); start.setDate(start.getDate()-45);
+        const end = new Date(); end.setDate(end.getDate()+45);
+        const er = await (await api(`/v1/integrations/google_calendar/events?start_date=${start.toISOString()}&end_date=${end.toISOString()}&max_results=50`)).json();
+        events = er.events||[];
+      } catch(e){ /* não conectado, ok */ }
+      journalData = {
+        convos: byDay(convos, c=>c.created_at),
+        mems: byDay(mems, m=>m.created_at),
+        tasks: byDay(tasks, t=>t.completed_at||t.created_at),
+        events: byDay(events, e=>evStart(e)),
+        native,
+        allDays: new Set(),
+      };
+      [journalData.convos, journalData.mems, journalData.tasks].forEach(idx=>Object.keys(idx).forEach(k=>journalData.allDays.add(k)));
+      Object.keys(native).forEach(k=>journalData.allDays.add(k));
+      Object.keys(journalData.events).forEach(k=>journalData.allDays.add(k));
+    } catch(e){ main.innerHTML = `<div class="empty">Erro ao carregar jornal: ${e.message}</div>`; return; }
+  }
+  // mês/dia inicial = dia mais recente com conteúdo ATÉ HOJE (ignora eventos futuros do calendar)
+  if (calYear===undefined){
+    const today = dayKey(new Date());
+    const days = [...journalData.allDays].filter(d=>d<=today).sort().reverse();
+    const startDay = days.length ? days[0] : today;
+    const ref = new Date(startDay+'T12:00:00');
+    calYear = ref.getFullYear(); calMonth = ref.getMonth();
+    selectDay(startDay);   // já busca o resumo salvo
+    return;
+  }
+  renderJournal();
+}
+
+window.calNav = (delta) => {
+  calMonth += delta;
+  if (calMonth<0){ calMonth=11; calYear--; } if (calMonth>11){ calMonth=0; calYear++; }
+  renderJournal();
+};
+window.selectDay = async (key) => {
+  selectedDay = key;
+  renderJournal();
+  // busca resumo PERSISTIDO no backend (1x por dia; cacheia local)
+  if (journalSummaries[key]===undefined){
+    journalSummaries[key] = null;   // marca como "buscando" (evita refetch)
+    try {
+      const r = await (await api(`/v1/journal-summaries/${key}`)).json();
+      if (r && r.summary){ journalSummaries[key] = r.summary; if (selectedDay===key) renderJournal(); }
+    } catch(e){ /* sem resumo salvo, ok */ }
+  }
+};
+
+function renderJournal(){
+  const main = document.getElementById('main');
+  if (!journalData) return;   // ainda carregando
+  // === calendário ===
+  const first = new Date(calYear, calMonth, 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const todayKey = dayKey(new Date());
+  let cal = `<div class="cal"><div class="cal-nav"><button onclick="calNav(-1)">‹</button>`
+          + `<span class="cal-title">${MONTHS[calMonth]} ${calYear}</span>`
+          + `<button onclick="calNav(1)">›</button></div><div class="cal-grid">`;
+  for (const d of DOW) cal += `<div class="cal-dow">${d}</div>`;
+  for (let i=0;i<startDow;i++) cal += `<div class="cal-day empty"></div>`;
+  for (let d=1; d<=daysInMonth; d++){
+    const key = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const has = journalData.allDays.has(key);
+    const cls = ['cal-day', has?'has':'', key===selectedDay?'sel':'', key===todayKey?'today':''].filter(Boolean).join(' ');
+    cal += `<div class="${cls}" ${has?`onclick="selectDay('${key}')"`:''}>${d}${has?'<div class="pip"></div>':''}</div>`;
+  }
+  cal += `</div></div>`;
+
+  // === jornal do dia selecionado ===
+  const convos = journalData.convos[selectedDay]||[];
+  const mems = journalData.mems[selectedDay]||[];
+  const tasks = journalData.tasks[selectedDay]||[];
+  const events = (journalData.events||{})[selectedDay]||[];
+  const lbl = selectedDay ? new Date(selectedDay+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}) : '';
+  let j = `<h2 class="journal-day-title">${lbl}</h2>`;
+
+  // resumo do dia: prioriza o NATIVO do Omi (rico) > resumo GLM salvo > gerar
+  const native = (journalData.native||{})[selectedDay];
+  if (native){
+    j += renderNativeSummary(native);
+  } else {
+    const cached = journalSummaries[selectedDay];
+    j += `<div class="journal-summary" id="jsummary">`;
+    if (cached){
+      j += esc(cached);
+      j += `<div style="margin-top:10px"><span class="convlink" onclick="genJournalSummary(true)">↻ Regerar resumo</span></div>`;
+    }
+    else if (!convos.length && !mems.length){ j += `<span class="ld">Sem conteúdo neste dia para resumir.</span>`; }
+    else { j += `<span class="ld">📝 <span class="convlink" onclick="genJournalSummary()">Gerar resumo do dia com IA →</span></span>`; }
+    j += `</div>`;
+  }
+
+  if (!convos.length && !mems.length && !tasks.length && !events.length){
+    j += `<div class="empty">Nada registrado neste dia.</div>`;
+  }
+  if (events.length){
+    j += `<div class="journal-sec"><h3>📆 Agenda (${events.length})</h3>`;
+    for (const e of events) j += eventRow(e);
+    j += `</div>`;
+  }
+  if (convos.length){
+    j += `<div class="journal-sec"><h3>🎙️ Conversas (${convos.length})</h3>`;
+    for (const c of convos){ const t=c.structured||{}; j += `<div class="item mem" onclick="openConvo('${c.id}')"><div class="head">${esc(t.category||c.source||'')}</div><div class="body"><b>${esc(t.title||'(sem título)')}</b><br>${esc(t.overview||'')}</div><div class="date">${fmtDate(c.created_at)}</div></div>`; }
+    j += `</div>`;
+  }
+  if (tasks.length){
+    j += `<div class="journal-sec"><h3>✓ Tarefas (${tasks.length})</h3>`;
+    for (const t of tasks){ const done=t.completed||t.is_completed; const link=t.conversation_id?`<span class="convlink" onclick="event.stopPropagation();openConvo('${t.conversation_id}')">🎙️ ver conversa</span>`:''; j += `<div class="item task ${done?'done':''}"><div class="dot" style="cursor:default">✓</div><div class="body">${esc(taskTxt(t))}${link}</div></div>`; }
+    j += `</div>`;
+  }
+  if (mems.length){
+    j += `<div class="journal-sec"><h3>🧠 Memórias (${mems.length})</h3>`;
+    for (const m of mems){ const s=memSource(m); const link=(m.conversation_id&&!m.manually_added)?`<span class="convlink" onclick="event.stopPropagation();openConvo('${m.conversation_id}')">🎙️ ver conversa</span>`:''; j += `<div class="item"><div class="head">${esc(m.category||'')}<span class="src ${s.cls}">${s.icon} ${s.label}</span></div><div class="body">${esc(m.content)}</div>${link}</div>`; }
+    j += `</div>`;
+  }
+  main.innerHTML = `<div class="journal-layout">`
+                 + `<div class="journal-left">` + cal + `</div>`
+                 + `<div class="journal-right">` + j + `</div>`
+                 + `</div>`;
+}
+
+// resumo NATIVO do Omi (daily_summaries) — rico, com destaques linkáveis
+function renderNativeSummary(s){
+  const cl = (cid) => cid ? `onclick="openConvo('${cid}')" style="cursor:pointer"` : '';
+  let h = `<div class="journal-summary native">`;
+  h += `<div class="ns-head">${s.day_emoji||'📓'} <b>${esc(s.headline||'Resumo do dia')}</b></div>`;
+  if (s.overview) h += `<div class="ns-over">${esc(s.overview)}</div>`;
+  const stats = s.stats||{};
+  if (stats.total_conversations) h += `<div class="ns-stats">${stats.total_conversations} conversas${stats.action_items_count?` · ${stats.action_items_count} tarefas`:''}</div>`;
+
+  const sec = (title, arr, fmt) => {
+    if (!arr || !arr.length) return '';
+    let x = `<div class="ns-sec"><h4>${title}</h4>`;
+    for (const it of arr) x += fmt(it);
+    return x + `</div>`;
+  };
+  h += sec('✨ Destaques', s.highlights, it => {
+    const cid = (it.conversation_ids&&it.conversation_ids[0]) || it.conversation_id;
+    const emoji = it.emoji ? it.emoji+' ' : '';
+    const topic = it.topic ? `<b>${esc(it.topic)}:</b> ` : '';
+    const txt = it.summary || it.title || it.text || it.highlight || it.description || '';
+    return `<div class="ns-item" ${cl(cid)}>• ${emoji}${topic}${esc(txt)}${cid?' <span class="convlink">ver →</span>':''}</div>`;
+  });
+  h += sec('✅ Decisões', s.decisions_made, it =>
+    `<div class="ns-item" ${cl(it.conversation_id)}>• ${esc(it.decision||it.text||'')}${it.conversation_id?' <span class="convlink">ver →</span>':''}</div>`);
+  h += sec('💡 Insights', s.knowledge_nuggets, it =>
+    `<div class="ns-item" ${cl(it.conversation_id)}>• ${esc(it.insight||it.text||'')}${it.conversation_id?' <span class="convlink">ver →</span>':''}</div>`);
+  h += sec('❓ Em aberto', s.unresolved_questions, it =>
+    `<div class="ns-item" ${cl(it.conversation_id)}>• ${esc(it.question||it.text||'')}${it.conversation_id?' <span class="convlink">ver →</span>':''}</div>`);
+  h += `<div class="ns-foot">Resumo gerado pelo Omi</div>`;
+  h += `</div>`;
+  return h;
+}
+
+let journalSummaries = {};   // cache local por dia (espelha o backend)
+window.genJournalSummary = async (force) => {
+  const day = selectedDay;
+  const convos = journalData.convos[day]||[];
+  const mems = journalData.mems[day]||[];
+  const box = document.getElementById('jsummary');
+  box.innerHTML = `<span class="ld">${force?'Regerando':'Gerando'} resumo…</span>`;
+  // monta contexto enxuto do dia
+  const ctx = [];
+  for (const c of convos){ const t=c.structured||{}; ctx.push(`Conversa: ${t.title||''} — ${t.overview||''}`); }
+  for (const m of mems.slice(0,40)){ ctx.push(`Memória: ${m.content}`); }
+  const prompt = `Você é meu diário pessoal. Resuma o meu dia ${day} em 1 parágrafo curto e pessoal (2ª pessoa, pt-BR), com base nestes registros. Destaque o que importou e pendências. NÃO invente nada além do que está aqui.\n\n${ctx.join('\n')}`;
+  try {
+    const r = await api('/v2/messages', { method:'POST', body: JSON.stringify({ text: prompt }) });
+    const txt = (await readChatStream(r)) || '(sem resumo)';
+    journalSummaries[day] = txt;
+    // PERSISTE no backend (não regenera ao reabrir)
+    try { await api(`/v1/journal-summaries/${day}`, { method:'PUT', body: JSON.stringify({ summary: txt }) }); } catch(e){}
+    if (selectedDay===day) renderJournal();
+  } catch(e){ box.innerHTML = `<span class="ld">Erro: ${esc(e.message)}</span>`; }
+};
+
+// parser compartilhado do stream do chat (data:/done: base64 UTF-8)
+async function readChatStream(r){
+  const ct = r.headers.get('content-type')||'';
+  if (!(ct.includes('text/event-stream')||ct.includes('text/plain'))){ const j=await r.json(); return j.text||''; }
+  const reader = r.body.getReader(); const dec = new TextDecoder();
+  let buf='', text='';
+  while(true){
+    const {done,value}=await reader.read(); if(done)break;
+    buf += dec.decode(value,{stream:true});
+    const lines = buf.split('\n'); buf = lines.pop();
+    for (let ln of lines){
+      ln = ln.replace(/\r$/,'');
+      if (ln.startsWith('done:')){
+        try { const b=atob(ln.slice(5).trim()); const bytes=Uint8Array.from(b,c=>c.charCodeAt(0)); const j=JSON.parse(new TextDecoder('utf-8').decode(bytes)); if(j.text) text=j.text; } catch(e){}
+        continue;
+      }
+      if (ln.startsWith('data:')){ let tok=ln.slice(5); if(tok.startsWith(' '))tok=tok.slice(1); tok=tok.replace(/__CRLF__/g,'\n'); if(tok==='[DONE]')continue; text+=tok; }
+    }
+  }
+  return text;
+}
+
+async function loadChat(){
+  const log = document.getElementById('chatlog');
+  if (log.dataset.loaded) return;
+  try {
+    const data = await (await api('/v2/messages')).json();
+    log.innerHTML = '';
+    for (const m of data.slice(-30)){
+      addMsg(m.text||'', m.sender==='ai'?'ai':'user');
+    }
+    log.dataset.loaded = '1';
+  } catch(e){ log.innerHTML = `<div class="empty">Histórico indisponível: ${e.message}</div>`; }
+}
+function addMsg(text, who){
+  const log = document.getElementById('chatlog');
+  const d = document.createElement('div');
+  d.className = 'msg ' + who;
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+window.sendChat = async () => {
+  const inp = document.getElementById('chatinput');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  addMsg(text, 'user');
+  const thinking = addMsg('…', 'ai');
+  try {
+    const r = await api('/v2/messages', { method:'POST', body: JSON.stringify({ text }) });
+    const ct = r.headers.get('content-type')||'';
+    if (ct.includes('text/event-stream') || ct.includes('text/plain')){
+      const reader = r.body.getReader(); const dec = new TextDecoder();
+      let buf='', text='';
+      thinking.textContent='';
+      while(true){
+        const {done,value}=await reader.read(); if(done)break;
+        buf += dec.decode(value,{stream:true});
+        const lines = buf.split('\n');
+        buf = lines.pop(); // guarda a última (incompleta)
+        for (let ln of lines){
+          ln = ln.replace(/\r$/,'');
+          if (ln.startsWith('done:')){
+            // mensagem final em base64 JSON — decode UTF-8 correto (atob é latin1)
+            try {
+              const b = atob(ln.slice(5).trim());
+              const bytes = Uint8Array.from(b, c => c.charCodeAt(0));
+              const j = JSON.parse(new TextDecoder('utf-8').decode(bytes));
+              if (j.text) text = j.text;
+            } catch(e){}
+            continue;
+          }
+          if (ln.startsWith('data:')){
+            let tok = ln.slice(5);
+            if (tok.startsWith(' ')) tok = tok.slice(1);
+            tok = tok.replace(/__CRLF__/g, '\n');
+            if (tok === '[DONE]') continue;
+            text += tok;
+          }
+          // ignora linhas 'think:', 'event:', vazias
+        }
+        thinking.textContent = text || '…';
+        document.getElementById('chatlog').scrollTop=1e9;
+      }
+      if (!text.trim()) thinking.textContent = '(sem resposta)';
+    } else {
+      const j = await r.json();
+      thinking.textContent = j.text || JSON.stringify(j);
+    }
+  } catch(e){ thinking.textContent = 'Erro: ' + e.message; }
+};
+
+// ===== STARGATE — copiloto pessoal (roteiros guiados + log) =====
+// Roteiros derivados dos manuais Stargate (vault jamjoy-core/stargate/).
+// Cada passo pode ter um timer (secs). Ao fim, opção de salvar um registro como
+// memória manual com prefixo [Stargate], que alimenta o painel de log abaixo.
+const STG_ROTEIROS = [
+  { id:'inicio', icon:'☀️', nome:'Início do dia', desc:'Descarregar a cabeça e mirar em uma só coisa.', tags:['sobrecarga','procrastinação'],
+    passos:[
+      {t:'Caixa de descarga', secs:120, txt:'Escreva tudo o que está pesando agora — uma preocupação por linha. Tirar da cabeça já alivia. Depois você escolhe o que vira tarefa.', descarga:true},
+      {t:'Uma só coisa', secs:60, txt:'Se só UMA coisa acontecer hoje, qual é? Essa é sua âncora do dia.', pedeTexto:'A única coisa que importa hoje'},
+      {t:'Menor primeiro passo', secs:60, txt:'Qual o menor passo possível (de ~10 min) para começar essa coisa? O cérebro inicia quando o passo é pequeno.', pedeTexto:'Menor primeiro passo (~10 min)'},
+      {t:'Respiração de mira', secs:120, txt:'6 respirações lentas: inspire 4s, expire 6s, segurando a intenção do dia.'},
+      {t:'Começar agora', secs:0, txt:'Comece o primeiro passo AGORA — antes de abrir e-mail/WhatsApp.'},
+    ], log:'Início do dia feito' },
+  { id:'foco', icon:'🧗', nome:'Bloco de foco (50 min)', desc:'Trabalho profundo com disciplina de AOL contra a dispersão.', tags:['foco','dispersão'],
+    passos:[
+      {t:'Cool-down', secs:120, txt:'4 respirações calmas. Solte ombros e rosto.'},
+      {t:'Declare o alvo', secs:60, txt:'Uma frase única: o que fica PRONTO em 50 min?', pedeTexto:'Alvo deste bloco'},
+      {t:'Foco (50 min)', secs:3000, txt:'Trabalhe no alvo. Se vier a vontade de fugir ("só ver o WhatsApp…"), isso é um AOL: anote aqui a distração e volte ao alvo. Não ceda, não se culpe — só registre e volte.', pedeTexto:'Distrações que apareceram (AOLs)'},
+      {t:'Fechamento', secs:0, txt:'Entregou o alvo? Registre sua confiança de 0 a 100% de que ficou bom (vai pro log de calibração).', pedeConfianca:true},
+    ], log:'Bloco de foco concluído' },
+  { id:'decisao', icon:'⚖️', nome:'Decisão (intuição + checagem)', desc:'Capturar o palpite antes dos dados, depois confrontar.', tags:['decisão','indecisão'],
+    passos:[
+      {t:'Formule', secs:60, txt:'Reduza a decisão a uma pergunta fechada (ex.: subir o preço da linha X em 8%? sim/não/quanto).', pedeTexto:'A pergunta da decisão'},
+      {t:'Intuição ANTES dos dados', secs:180, txt:'Olhos fechados, leve a pergunta e deixe a primeira resposta surgir. Note a gestalt e a SENSAÇÃO (confortável? tensa?).', pedeTexto:'O que surgiu (gestalt + sensação)'},
+      {t:'Separe percepção de palpite', secs:60, txt:'O que é percepção ("isso me dá segurança") vs. palpite disfarçado de fato ("com certeza vende")? Escreva cada um.', pedeTexto:'Percepções vs. palpites'},
+      {t:'Checagem racional', secs:300, txt:'SÓ AGORA os dados: números, riscos, downside.', pedeTexto:'Dados e riscos (opcional)'},
+      {t:'Confronto', secs:60, txt:'Intuição bate com os dados? Se sim, decida. Se não, a divergência é o sinal mais valioso — investigue o gap.', pedeConfianca:true},
+    ], log:'Decisão registrada' },
+  { id:'craving', icon:'🚬', nome:'Craving (atravessar a onda)', desc:'Apoio para o impulso de fumar. NÃO substitui tratamento.', tags:['vício','cigarro'],
+    passos:[
+      {t:'Nomeie e cronometre', secs:30, txt:'"Estou com craving; ele dura ~3-5 min e vai passar." O pico é curto e decrescente.'},
+      {t:'Adiamento (não "resistência")', secs:300, txt:'Não é "nunca", é "agora não — daqui a 5 min reavalio". Deixe o timer correr.'},
+      {t:'Respiração no lugar do gesto', secs:120, txt:'A mesma inspiração longa do cigarro, sem ele: inspire 4s, segure 2s, expire 6s. Ocupe mãos e boca (água, caminhar 20 passos).'},
+      {t:'Onda atravessada', secs:0, txt:'Você atravessou. Isso é prova de que consegue — vai pro seu histórico.'},
+    ], log:'Craving atravessado', aviso:'Parar de fumar tem tratamento comprovado (reposição de nicotina, bupropiona/vareniclina, apoio do SUS — Disque Saúde 136). Este roteiro ajuda no momento, não substitui o tratamento de base.' },
+  { id:'fimdia', icon:'🌙', nome:'Fim do dia (desligar + reconhecer)', desc:'Desacelerar e registrar o que deu certo.', tags:['ansiedade','autoconfiança','reconhecimento'],
+    passos:[
+      {t:'Caixa de amanhã', secs:90, txt:'O que ficou aberto? Guarde pra amanhã, tire da cabeça pra não remoer na cama.'},
+      {t:'3 vitórias', secs:180, txt:'Diga 3 coisas que você fez hoje, por menores que sejam. (Seu cérebro registra falhas por default; force o registro dos acertos.)', pedeTexto:'Suas 3 vitórias de hoje'},
+      {t:'Onde confiei em mim', secs:60, txt:'Qual decisão/ação veio do seu julgamento e deu certo? Autoconfiança cresce por evidência, não por afirmação.', pedeTexto:'Onde você confiou em si hoje'},
+      {t:'Relaxamento Focus 10', secs:180, txt:'Deitado, varra o corpo dos pés à cabeça soltando tensão. "Corpo pesado, mente calma."'},
+      {t:'Encerrar', secs:0, txt:'Uma frase de fechamento do dia. Durma.'},
+    ], log:'Dia encerrado' },
+];
+
+let stgState = null;   // roteiro em execução
+let stgTimer = null;
+let stgMemos = [];      // memórias [Stargate] p/ o log
+
+async function loadStargate(){
+  const main = document.getElementById('main');
+  main.innerHTML = '<div class="loading">Carregando…</div>';
+  // busca as memórias [Stargate] p/ o painel de log
+  try {
+    const data = await (await api('/v3/memories?limit=500&offset=0')).json();
+    stgMemos = (Array.isArray(data)?data:[]).filter(m=>(m.content||'').startsWith('[Stargate]'))
+                 .sort((a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0));
+  } catch(e){ stgMemos = []; }
+  renderStargateHome();
+}
+
+function renderStargateHome(){
+  const main = document.getElementById('main');
+  let h = `<div class="wrap">`;
+  h += `<div style="margin:4px 0 14px"><h2 style="font-size:22px;font-weight:700">🌌 Stargate — Copiloto Pessoal</h2>`;
+  h += `<p style="color:var(--mut);font-size:13px;margin-top:4px">Roteiros curtos de foco, decisão, calma e reconhecimento. O efeito vem de atenção + respiração + estrutura — não de nada místico.</p></div>`;
+  h += `<div class="stg-grid">`;
+  for (const r of STG_ROTEIROS){
+    h += `<div class="stg-card" onclick="stgStart('${r.id}')">`
+      +  `<div class="stg-ic">${r.icon}</div>`
+      +  `<div class="stg-tt">${esc(r.nome)}</div>`
+      +  `<div class="stg-ds">${esc(r.desc)}</div>`
+      +  `<div class="stg-meta">${r.passos.length} passos</div></div>`;
+  }
+  h += `</div>`;
+  // painel de log
+  h += `<h3 style="margin:22px 0 10px;font-size:15px">📒 Seu histórico</h3>`;
+  if (!stgMemos.length){
+    h += `<div class="empty" style="padding:20px">Ainda sem registros. Complete um roteiro para começar seu histórico de vitórias e calibração.</div>`;
+  } else {
+    const wins = stgMemos.filter(m=>/vit[óo]ria|reconhec/i.test(m.content)).length;
+    const crav = stgMemos.filter(m=>/craving/i.test(m.content)).length;
+    h += `<div class="stg-stats">`
+      +  `<div class="stg-stat"><b>${stgMemos.length}</b><span>registros</span></div>`
+      +  `<div class="stg-stat"><b>${wins}</b><span>com vitórias</span></div>`
+      +  `<div class="stg-stat"><b>${crav}</b><span>cravings atravessados</span></div></div>`;
+    for (const m of stgMemos.slice(0,30)){
+      h += `<div class="item" style="cursor:default"><div class="body">${esc(m.content.replace(/^\[Stargate\]\s*/,''))}</div>`
+        +  `<div class="date">${fmtDate(m.created_at)}</div></div>`;
+    }
+  }
+  h += `</div>`;
+  main.innerHTML = h;
+}
+
+window.stgStart = (id) => {
+  const r = STG_ROTEIROS.find(x=>x.id===id); if(!r) return;
+  stgState = { r, i:0, remaining:0, confianca:null, textos:[], descarga:[] };
+  renderStgStep();
+};
+
+function renderStgStep(){
+  const main = document.getElementById('main');
+  const {r,i} = stgState;
+  const p = r.passos[i];
+  clearInterval(stgTimer);
+  let h = `<div class="wrap stg-run">`;
+  h += `<div class="stg-run-top"><span onclick="stgHome()" class="stg-back">‹ voltar</span>`
+    +  `<span class="stg-run-title">${r.icon} ${esc(r.nome)}</span>`
+    +  `<span class="stg-prog">${i+1}/${r.passos.length}</span></div>`;
+  if (r.aviso && i===0){ h += `<div class="stg-warn">⚠️ ${esc(r.aviso)}</div>`; }
+  h += `<div class="stg-step"><div class="stg-step-t">${esc(p.t)}</div>`;
+  h += `<div class="stg-step-x">${esc(p.txt)}</div>`;
+  if (p.secs>0){ h += `<div class="stg-timer" id="stgtimer">${fmtSecs(p.secs)}</div>`; }
+  if (p.pedeConfianca){ h += `<div class="stg-conf">Confiança: <input id="stgconf" type="range" min="0" max="100" value="70" oninput="document.getElementById('stgconfv').textContent=this.value+'%'"> <span id="stgconfv">70%</span></div>`; }
+  if (p.pedeTexto){ h += `<textarea id="stgtext" class="stg-text" placeholder="${esc(p.pedeTexto)}…"></textarea>`; }
+  if (p.descarga){
+    const val = (stgState.descarga||[]).join('\n');
+    h += `<textarea id="stgdescarga" class="stg-text" style="min-height:150px" placeholder="Uma preocupação por linha…&#10;ex.: responder o Patrick sobre a linha Timon&#10;ex.: revisar o pricing da Salvador">${esc(val)}</textarea>`;
+    h += `<div style="color:var(--mut);font-size:12px;margin-top:6px">💡 No fim do roteiro você escolhe quais viram tarefa.</div>`;
+  }
+  h += `<div class="stg-actions">`;
+  if (p.secs>0){ h += `<button class="stg-btn2" onclick="stgToggleTimer()" id="stgtbtn">▶ Iniciar timer</button>`; }
+  const last = i===r.passos.length-1;
+  h += `<button class="gbtn" onclick="stgNext()">${last?'Concluir ✓':'Próximo ›'}</button>`;
+  h += `</div></div></div>`;
+  main.innerHTML = h;
+  stgState.remaining = p.secs;
+}
+
+let stgRunning=false;
+window.stgToggleTimer = () => {
+  const btn=document.getElementById('stgtbtn');
+  if (stgRunning){ clearInterval(stgTimer); stgRunning=false; if(btn) btn.textContent='▶ Retomar'; return; }
+  stgRunning=true; if(btn) btn.textContent='⏸ Pausar';
+  stgTimer = setInterval(()=>{
+    stgState.remaining--;
+    const el=document.getElementById('stgtimer');
+    if (el) el.textContent = fmtSecs(Math.max(0,stgState.remaining));
+    if (stgState.remaining<=0){ clearInterval(stgTimer); stgRunning=false; if(el) el.classList.add('done'); if(btn) btn.textContent='✓ tempo'; }
+  },1000);
+};
+function fmtSecs(s){ const m=Math.floor(s/60), x=s%60; return `${m}:${String(x).padStart(2,'0')}`; }
+
+window.stgNext = () => {
+  const {r,i} = stgState;
+  const p = r.passos[i];
+  clearInterval(stgTimer); stgRunning=false;
+  if (p.pedeConfianca){ const c=document.getElementById('stgconf'); if(c) stgState.confianca=c.value; }
+  if (p.pedeTexto){ const t=document.getElementById('stgtext'); if(t&&t.value.trim()) stgState.textos.push(`${p.pedeTexto}: ${t.value.trim()}`); }
+  if (p.descarga){ const d=document.getElementById('stgdescarga');
+    if(d) stgState.descarga = d.value.split('\n').map(s=>s.trim()).filter(Boolean); }
+  if (i < r.passos.length-1){ stgState.i++; renderStgStep(); return; }
+  stgFinish();
+};
+
+async function stgFinish(){
+  const {r} = stgState;
+  const main = document.getElementById('main');
+  // monta o registro
+  let linha = `[Stargate] ${r.log}`;
+  if (stgState.confianca!=null) linha += ` · confiança ${stgState.confianca}%`;
+  if (stgState.textos.length) linha += `\n` + stgState.textos.join('\n');
+  if (stgState.descarga.length) linha += `\nDescarga:\n` + stgState.descarga.map(x=>'• '+x).join('\n');
+  stgState.linha = linha;   // guardado no estado (evita passar string pelo HTML)
+  let h = `<div class="wrap stg-run"><div class="stg-done">`
+    + `<div style="font-size:40px">✓</div><h2 style="margin:8px 0">${esc(r.nome)} — feito</h2>`;
+  // se houve descarga, deixa escolher quais viram tarefa
+  if (stgState.descarga.length){
+    h += `<p style="color:var(--mut);margin-bottom:10px">Marque o que vira tarefa (o resto fica só no registro):</p>`;
+    h += `<div class="stg-preview" style="padding:10px 14px">`;
+    stgState.descarga.forEach((item,ix)=>{
+      h += `<label class="stg-dcheck"><input type="checkbox" data-ix="${ix}"> ${esc(item)}</label>`;
+    });
+    h += `</div>`;
+  }
+  h += `<p style="color:var(--mut);margin:16px 0 10px">Quer guardar no seu histórico?</p>`
+    + `<div class="stg-preview">${esc(linha)}</div>`
+    + `<div class="stg-actions" style="justify-content:center;margin-top:16px">`
+    + `<button class="stg-btn2" onclick="stgHome()">Não guardar</button>`
+    + `<button class="gbtn" onclick="stgSaveCurrent(this)">Guardar no histórico</button>`
+    + `</div></div></div>`;
+  main.innerHTML = h;
+}
+
+window.stgSaveCurrent = async (btn) => {
+  if (!stgState || !stgState.linha) return;
+  if (btn){ btn.disabled=true; btn.textContent='Guardando…'; }
+  // coleta itens de descarga marcados p/ virar tarefa
+  const tarefas = [];
+  document.querySelectorAll('#main input[type=checkbox][data-ix]').forEach(cb=>{
+    if (cb.checked){ const ix=+cb.dataset.ix; if(stgState.descarga[ix]) tarefas.push(stgState.descarga[ix]); }
+  });
+  try {
+    await api('/v3/memories', { method:'POST', body: JSON.stringify({ content: stgState.linha, visibility:'private' }) });
+    for (const desc of tarefas){
+      try { await api('/v1/action-items', { method:'POST', body: JSON.stringify({ description: desc, completed:false }) }); }
+      catch(_){ /* uma tarefa falhar não aborta o resto */ }
+    }
+    allMemories = [];   // invalida cache p/ refletir a nova memória
+    const n = tarefas.length;
+    stgState = null;
+    await loadStargate();
+    if (n) toast(`${n} tarefa(s) criada(s) na aba Tarefas.`);
+  } catch(e){ if(btn){btn.disabled=false;btn.textContent='Guardar no histórico';} alert('Erro ao guardar: '+e.message); }
+};
+function toast(msg){
+  let t=document.getElementById('stgtoast');
+  if(!t){ t=document.createElement('div'); t.id='stgtoast'; document.body.appendChild(t);
+    t.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;padding:12px 22px;border-radius:10px;font-size:14px;z-index:9999;box-shadow:0 6px 20px rgba(0,0,0,.4)'; }
+  t.textContent=msg; t.style.display='block';
+  setTimeout(()=>{ if(t) t.style.display='none'; }, 3500);
+}
+window.stgHome = () => { clearInterval(stgTimer); stgRunning=false; stgState=null; renderStargateHome(); };
+</script>
+</body>
+</html>
