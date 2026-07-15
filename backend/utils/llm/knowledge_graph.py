@@ -16,6 +16,29 @@ from .clients import get_llm
 from .usage_tracker import track_usage, Features
 from database import knowledge_graph as kg_db
 
+# Cap de nos injetados no prompt de extracao do grafo.
+# CAUSA: injetar TODOS os nos (ex: 2929 = ~85k tokens) por memoria torna o custo
+# quadratico no tamanho do grafo (knowledge_graph foi 96% do custo no pico).
+# FIX: a IA so precisa dos nos MAIS PROVAVEIS DE COLIDIR p/ deduplicar labels —
+# os mais referenciados (len(memory_ids)) e mais recentes. Top-200 cobre isso e
+# corta >90% dos tokens, preservando o merge de entidades.
+KG_PROMPT_NODE_CAP = 200
+
+
+def _relevant_nodes_for_prompt(uid: str, limit: int = KG_PROMPT_NODE_CAP):
+    """Nos mais relevantes p/ dedup no prompt: mais referenciados + mais recentes."""
+    nodes = kg_db.get_knowledge_nodes(uid)
+    if len(nodes) <= limit:
+        return nodes
+
+    def _key(n):
+        refs = len(n.get('memory_ids') or [])
+        upd = n.get('updated_at') or n.get('created_at')
+        ts = upd.timestamp() if hasattr(upd, 'timestamp') else 0.0
+        return (refs, ts)
+
+    return sorted(nodes, key=_key, reverse=True)[:limit]
+
 
 class ExtractedNode(BaseModel):
     label: str = Field(description="The name of the entity (e.g., 'Neo', 'Paris', 'Pizza')")
@@ -75,9 +98,10 @@ Extract entities and relationships. If no meaningful patterns found, return empt
 def extract_knowledge_from_memory(
     uid: str, memory_content: str, memory_id: str, user_name: str = "User"
 ) -> Optional[Dict[str, Any]]:
-    existing_nodes = kg_db.get_knowledge_nodes(uid)
+    existing_nodes = kg_db.get_knowledge_nodes(uid)  # COMPLETO — usado no merge (label_to_node_id) abaixo
+    # Apenas o PROMPT e capado em top-N (evita o bloat de tokens). O merge segue com todos.
     existing_nodes_summary = []
-    for node in existing_nodes:
+    for node in _relevant_nodes_for_prompt(uid):
         existing_nodes_summary.append(
             {
                 'id': node['id'],
@@ -172,9 +196,10 @@ def rebuild_knowledge_graph(uid: str, memories: List[Dict[str, Any]], user_name:
         if not memory_content:
             return {'nodes': [], 'edges': []}
 
-        existing_nodes = kg_db.get_knowledge_nodes(uid)
+        existing_nodes = kg_db.get_knowledge_nodes(uid)  # COMPLETO — usado no merge abaixo
+        # Apenas o PROMPT e capado em top-N (evita o bloat de tokens). O merge segue com todos.
         existing_nodes_summary = []
-        for node in existing_nodes:
+        for node in _relevant_nodes_for_prompt(uid):
             existing_nodes_summary.append(
                 {
                     'id': node['id'],
