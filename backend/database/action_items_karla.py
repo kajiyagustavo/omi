@@ -120,11 +120,17 @@ def create_action_items_batch(uid: str, action_items_data: List[dict]) -> List[s
 # ── READ ─────────────────────────────────────────────────────────────────────
 
 def get_action_item(uid: str, action_item_id: str) -> Optional[dict]:
-    # não há GET por id na API; lista e filtra (volume single-user é baixo)
-    for t in _listar():
-        if str(t["id"]) == str(action_item_id):
-            return _to_omi(t)
-    return None
+    # por id direto: resolver listando (limite 200) deixava tarefas antigas de
+    # fora → 404 em concluir/editar (bug de prod 14/07)
+    try:
+        t = _req("GET", f"/tarefas/{int(action_item_id)}")
+    except (ValueError, TypeError):
+        return None  # id não numérico: nunca existiu na Karla
+    except requests.HTTPError as e:
+        if e.response is not None and e.response.status_code == 404:
+            return None
+        raise
+    return _to_omi(t)
 
 
 def _listar(**params) -> List[dict]:
@@ -167,8 +173,13 @@ def get_action_items_by_conversation(uid: str, conversation_id: str) -> List[dic
 
 
 def get_action_items_by_ids(uid: str, action_item_ids: List[str]) -> List[dict]:
-    ids = {str(i) for i in action_item_ids}
-    return [_to_omi(t) for t in _listar(limite=1000) if str(t["id"]) in ids]
+    # por id direto (o filtro-em-lista estourava no limite quando >1000 tarefas)
+    itens = []
+    for i in action_item_ids:
+        t = get_action_item(uid, i)
+        if t:
+            itens.append(t)
+    return itens
 
 
 # ── UPDATE ───────────────────────────────────────────────────────────────────
