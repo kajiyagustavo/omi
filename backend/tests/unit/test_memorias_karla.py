@@ -84,7 +84,7 @@ def test_create_memory_gera_origem_do_id_omi():
             "id": "hash-do-conteudo", "content": "x", "category": "manual",
             "tags": [], "created_at": datetime(2026, 7, 1, tzinfo=timezone.utc),
             "scoring": "01_998_2", "visibility": "private"})
-        corpo = rq.request.call_args.kwargs["json_body"]
+        corpo = rq.request.call_args.kwargs["json"]  # _req passa json= pro requests
         assert corpo["origem"] == "omi:hash-do-conteudo"
         assert corpo["categoria"] == "manual"
         assert corpo["extras"]["scoring"] == "01_998_2"
@@ -106,7 +106,7 @@ def test_review_memory_faz_extras_merge():
         memories_karla.review_memory("uid", "42", False)
         patch_call = rq.request.call_args_list[-1]
         assert patch_call.args[0] == "PATCH"
-        assert patch_call.kwargs["json_body"]["extras_merge"]["user_review"] is False
+        assert patch_call.kwargs["json"]["extras_merge"]["user_review"] is False
 
 
 def test_find_similar_shape_do_pinecone():
