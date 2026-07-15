@@ -1,10 +1,18 @@
 import os
+import sys
+import types
 from datetime import datetime, timezone
 from unittest.mock import patch, MagicMock
 
 os.environ.setdefault("MEMORIA_UNIFICADA_URL", "http://karla-fake:8765")
 os.environ.setdefault("MEMORIA_UNIFICADA_TOKEN", "tok-teste")
 os.environ.setdefault("MEMORIAS_KARLA", "true")
+
+# Stub Firestore client so importing models.memories doesn't trigger ADC lookups.
+_client = types.ModuleType("database._client")
+_client.db = MagicMock()
+_client.document_id_from_seed = lambda s: "id_" + str(abs(hash(s)) % 100000)
+sys.modules["database._client"] = _client
 
 from database import memories_karla  # noqa: E402
 
