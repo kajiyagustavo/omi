@@ -6,6 +6,7 @@ from typing import List
 
 from pinecone import Pinecone
 
+from database import memories_karla
 from utils.llm.clients import embeddings
 import logging
 
@@ -156,6 +157,9 @@ def upsert_memory_vector(uid: str, memory_id: str, content: str, category: str):
     """
     Upsert a memory embedding to Pinecone.
     """
+    if memories_karla.is_enabled():
+        return  # F4: embedding é server-side na Karla; Pinecone aposentado p/ memórias
+
     if index is None:
         logger.warning('Pinecone index not initialized, skipping memory vector upsert')
         return None
@@ -185,6 +189,9 @@ def upsert_memory_vectors_batch(uid: str, items: List[dict]) -> int:
     call + one upsert. Used by POST /v3/memories/batch and the dev batch API.
     Returns the number of vectors written (0 if Pinecone is not configured).
     """
+    if memories_karla.is_enabled():
+        return 0
+
     if index is None:
         logger.warning('Pinecone index not initialized, skipping memory vector batch upsert')
         return 0
@@ -220,6 +227,9 @@ def find_similar_memories(uid: str, content: str, threshold: float = 0.85, limit
     Returns list of matches with similarity scores.
     Used for duplicate detection and semantic search.
     """
+    if memories_karla.is_enabled():
+        return memories_karla.find_similar(content, threshold=threshold, limit=limit)
+
     if index is None:
         logger.warning('Pinecone index not initialized, skipping similarity search')
         return []
@@ -250,6 +260,10 @@ def check_memory_duplicate(uid: str, content: str, threshold: float = 0.85) -> d
     Check if a similar memory already exists.
     Returns the duplicate info if found, None otherwise.
     """
+    if memories_karla.is_enabled():
+        similares = memories_karla.find_similar(content, threshold=threshold, limit=1)
+        return similares[0] if similares else None
+
     similar = find_similar_memories(uid, content, threshold=threshold, limit=1)
     if similar:
         logger.warning(f'Found duplicate memory: {similar[0]}')
@@ -262,6 +276,9 @@ def search_memories_by_vector(uid: str, query: str, limit: int = 10) -> List[str
     Semantic search for memories.
     Returns list of memory_ids ordered by relevance.
     """
+    if memories_karla.is_enabled():
+        return [s["memory_id"] for s in memories_karla.find_similar(query, threshold=0.0, limit=limit)]
+
     if index is None:
         logger.warning('Pinecone index not initialized, skipping memory search')
         return []
@@ -280,6 +297,9 @@ def delete_memory_vector(uid: str, memory_id: str):
     """
     Delete a memory vector from Pinecone.
     """
+    if memories_karla.is_enabled():
+        return  # F4: DELETE /memorias já remove o vetor junto (mesma linha)
+
     if index is None:
         logger.warning('Pinecone index not initialized, skipping memory vector delete')
         return
