@@ -407,3 +407,34 @@ def migrate_memories(prev_uid: str, new_uid: str, app_id: str = None):
     batch.commit()
     logger.info(f'Migrated {len(memories_to_migrate)} memories from {prev_uid} to {new_uid}')
     return len(memories_to_migrate)
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4 ───────────────────────────────────────────
+# Com MEMORIAS_KARLA=true, os símbolos públicos passam a apontar pro shim
+# database/memories_karla (REST /u/<token>/memorias). Consumidores importam
+# `database.memories as memories_db`, então pegam a versão certa sem mudança
+# nos routers. Rollback = desligar a flag (Firestore fica intacto).
+import os as _os
+
+if _os.getenv("MEMORIAS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import memories_karla as _karla
+
+    get_memories = _karla.get_memories
+    get_user_public_memories = _karla.get_user_public_memories
+    get_non_filtered_memories = _karla.get_non_filtered_memories
+    create_memory = _karla.create_memory
+    save_memories = _karla.save_memories
+    delete_memories = _karla.delete_memories
+    get_memory = _karla.get_memory
+    get_memories_by_ids = _karla.get_memories_by_ids
+    review_memory = _karla.review_memory
+    set_memory_kg_extracted = _karla.set_memory_kg_extracted
+    change_memory_visibility = _karla.change_memory_visibility
+    update_memory_fields = _karla.update_memory_fields
+    edit_memory = _karla.edit_memory
+    delete_memory = _karla.delete_memory
+    delete_all_memories = _karla.delete_all_memories
+    get_memory_ids_for_conversation = _karla.get_memory_ids_for_conversation
+    delete_memories_for_conversation = _karla.delete_memories_for_conversation
+    unlock_all_memories = _karla.unlock_all_memories
+    logger.warning("memories: usando MEMÓRIA UNIFICADA (Karla) — MEMORIAS_KARLA on")
