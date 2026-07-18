@@ -259,6 +259,81 @@ def test_set_postprocessing_status_doc_ausente_nao_faz_patch():
         assert rq.request.call_count == 1
 
 
+class _FakePhoto:
+    """Stand-in mínimo pra pydantic ConversationPhoto — só precisa de .dict()."""
+
+    def __init__(self, **kwargs):
+        self._data = kwargs
+
+    def dict(self):
+        return dict(self._data)
+
+
+def test_store_conversation_photos_upsert_por_id_idempotente():
+    with patch.object(ck, "requests") as rq:
+        conv_sem_fotos = dict(CONV)
+        conv_sem_fotos["photos"] = []
+        rq.request.side_effect = [
+            _resp(conv_sem_fotos),  # GET
+            _resp({"ok": True}),  # PATCH (1ª chamada, foto p1)
+        ]
+        ck.store_conversation_photos("uid", "conv-1", [_FakePhoto(id="p1", url="http://x/p1.jpg")])
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        assert patch_args[0] == "PATCH"
+        merge1 = patch_kwargs["json"]["dados_merge"]
+        assert len(merge1["photos"]) == 1
+        assert merge1["photos"][0]["id"] == "p1"
+        assert merge1["photos"][0]["url"] == "http://x/p1.jpg"
+
+    # Segunda chamada: doc agora já tem a foto p1 (simulando estado pós-PATCH acima).
+    # Re-chamar com o MESMO id p1 deve sobrescrever (1 foto só), não duplicar.
+    with patch.object(ck, "requests") as rq:
+        conv_com_p1 = dict(CONV)
+        conv_com_p1["photos"] = [{"id": "p1", "url": "http://x/p1.jpg"}]
+        rq.request.side_effect = [
+            _resp(conv_com_p1),  # GET
+            _resp({"ok": True}),  # PATCH
+        ]
+        ck.store_conversation_photos("uid", "conv-1", [_FakePhoto(id="p1", url="http://x/p1-atualizada.jpg")])
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        merge2 = patch_kwargs["json"]["dados_merge"]
+        assert len(merge2["photos"]) == 1
+        assert merge2["photos"][0]["id"] == "p1"
+        assert merge2["photos"][0]["url"] == "http://x/p1-atualizada.jpg"
+
+    # Terceira chamada: doc já tem p1, agora manda um id NOVO (p2) — deve apendar,
+    # resultando em 2 fotos preservando a ordem (p1 primeiro, p2 depois).
+    with patch.object(ck, "requests") as rq:
+        conv_com_p1_v2 = dict(CONV)
+        conv_com_p1_v2["photos"] = [{"id": "p1", "url": "http://x/p1-atualizada.jpg"}]
+        rq.request.side_effect = [
+            _resp(conv_com_p1_v2),  # GET
+            _resp({"ok": True}),  # PATCH
+        ]
+        ck.store_conversation_photos("uid", "conv-1", [_FakePhoto(id="p2", url="http://x/p2.jpg")])
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        merge3 = patch_kwargs["json"]["dados_merge"]
+        assert len(merge3["photos"]) == 2
+        assert [p["id"] for p in merge3["photos"]] == ["p1", "p2"]
+
+
+def test_store_conversation_photos_sem_id_gera_uuid_e_apenda():
+    with patch.object(ck, "requests") as rq:
+        conv_sem_fotos = dict(CONV)
+        conv_sem_fotos["photos"] = []
+        rq.request.side_effect = [_resp(conv_sem_fotos), _resp({"ok": True})]
+        ck.store_conversation_photos("uid", "conv-1", [_FakePhoto(url="http://x/sem-id.jpg")])
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        merge = patch_kwargs["json"]["dados_merge"]
+        assert len(merge["photos"]) == 1
+        assert merge["photos"][0]["id"]  # uuid4 gerado
+        assert merge["photos"][0]["url"] == "http://x/sem-id.jpg"
+
+
 def test_footer_rebind():
     """Com CONVERSAS_KARLA=true, conversations.py rebinda pros símbolos do shim."""
     import subprocess

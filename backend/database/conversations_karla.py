@@ -641,21 +641,40 @@ def get_conversation_photos(uid: str, conversation_id: str) -> List[dict]:
 
 
 def store_conversation_photos(uid: str, conversation_id: str, photos):
-    """MERGE RASO trap: GET doc → append em photos → PATCH a chave inteira.
-    photos são pydantic → .dict()."""
+    """MERGE RASO trap: GET doc → upsert por id em photos → PATCH a chave inteira.
+    photos são pydantic → .dict().
+
+    Espelha o original (database/conversations.py, subcoleção `photos` keyed por
+    photo_id = photo.id or uuid4()): re-chamar com o mesmo id SOBRESCREVE aquela
+    foto (idempotente), nunca duplica. Fotos sem id (novas) recebem um uuid4() e
+    são apendadas, preservando a ordem das existentes."""
     try:
         dados = _get(conversation_id)
     except Exception as e:
         logger.warning(f"conversas_karla.store_conversation_photos: {sanitize(str(e))}")
         return
     existentes = (dados.get("photos", []) or []) if dados else []
-    novas = []
+    por_id: Dict[str, Any] = {}
+    ordem: List[str] = []
+    for foto in existentes:
+        foto_id = foto.get("id") if isinstance(foto, dict) else None
+        if foto_id:
+            por_id[foto_id] = foto
+            ordem.append(foto_id)
+        else:
+            # Fotos existentes sem id (legado): preserva por append direto.
+            foto_id = str(uuid.uuid4())
+            por_id[foto_id] = foto
+            ordem.append(foto_id)
     for photo in photos:
         data = photo.dict() if hasattr(photo, "dict") else dict(photo)
-        if not data.get("id"):
-            data["id"] = str(uuid.uuid4())
-        novas.append(data)
-    _patch_merge(conversation_id, {"photos": _serializar(existentes + novas)}, "store_conversation_photos")
+        photo_id = data.get("id") or str(uuid.uuid4())
+        data["id"] = photo_id
+        if photo_id not in por_id:
+            ordem.append(photo_id)
+        por_id[photo_id] = data
+    merged = [por_id[foto_id] for foto_id in ordem]
+    _patch_merge(conversation_id, {"photos": _serializar(merged)}, "store_conversation_photos")
 
 
 def delete_conversation_photos(uid: str, conversation_id: str) -> int:
