@@ -139,6 +139,12 @@ def search_apps_db(
     Returns:
         Lista de dicts de app batendo os filtros.
     """
+    # Short-circuit ANTES de buscar (replica o original: com installed_apps
+    # sem enabled_app_ids, o Firestore nunca chega a montar/rodar a query).
+    if installed_apps and (not enabled_app_ids or len(enabled_app_ids) == 0):
+        # Usuário não tem apps habilitados.
+        return []
+
     apps = _list_all_apps()
 
     # 1. Filtro mais restritivo primeiro (mesma ordem do original).
@@ -146,10 +152,6 @@ def search_apps_db(
         apps = [app for app in apps if app.get('uid') == uid]
 
     elif installed_apps:
-        if not enabled_app_ids or len(enabled_app_ids) == 0:
-            # Usuário não tem apps habilitados.
-            return []
-
         if len(enabled_app_ids) > 30:
             # Firestore limitava 'in' a 30 itens — aqui não há esse limite real
             # (client-side), mas replicamos o MESMO caminho do original: query
