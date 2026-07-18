@@ -160,6 +160,105 @@ def test_erro_de_rede_retorno_neutro_sem_raise():
         assert ck.get_conversations_count("uid") == 0
 
 
+def test_update_conversation_title_faz_get_merge_patch_sem_dotkeys():
+    with patch.object(ck, "requests") as rq:
+        rq.request.side_effect = [
+            _resp(CONV),  # GET
+            _resp({"ok": True}),  # PATCH
+        ]
+        ck.update_conversation_title("uid", "conv-1", "Novo título")
+
+        assert rq.request.call_count == 2
+        get_args, get_kwargs = rq.request.call_args_list[0]
+        assert get_args[0] == "GET"
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        assert patch_args[0] == "PATCH"
+        body = patch_kwargs["json"]
+        merge = body["dados_merge"]
+        # nenhuma chave com notação de ponto — o serviço faz merge raso literal
+        assert all("." not in k for k in merge)
+        assert "structured" in merge
+        assert merge["structured"]["title"] == "Novo título"
+        # sub-campos irmãos de structured preservados
+        assert merge["structured"]["action_items"] == CONV["structured"]["action_items"]
+
+
+def test_update_conversation_title_doc_ausente_nao_faz_patch():
+    with patch.object(ck, "requests") as rq:
+        import requests as real_requests
+
+        rq.HTTPError = real_requests.HTTPError
+        err = real_requests.HTTPError()
+        err.response = MagicMock(status_code=404)
+        r = MagicMock()
+        r.raise_for_status.side_effect = err
+        rq.request.return_value = r
+        ck.update_conversation_title("uid", "conv-1", "X")
+        # só a chamada GET (404) — nenhum PATCH subsequente
+        assert rq.request.call_count == 1
+
+
+def test_update_conversation_events_preserva_siblings_sem_dotkeys():
+    with patch.object(ck, "requests") as rq:
+        rq.request.side_effect = [_resp(CONV), _resp({"ok": True})]
+        novos_events = [{"title": "Evento novo"}]
+        ck.update_conversation_events("uid", "conv-1", novos_events)
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        merge = patch_kwargs["json"]["dados_merge"]
+        assert all("." not in k for k in merge)
+        assert merge["structured"]["events"] == novos_events
+        assert merge["structured"]["title"] == CONV["structured"]["title"]
+        assert merge["structured"]["action_items"] == CONV["structured"]["action_items"]
+
+
+def test_update_conversation_action_items_preserva_siblings_sem_dotkeys():
+    with patch.object(ck, "requests") as rq:
+        rq.request.side_effect = [_resp(CONV), _resp({"ok": True})]
+        novos_items = [{"description": "novo item", "completed": False}]
+        ck.update_conversation_action_items("uid", "conv-1", novos_items)
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        merge = patch_kwargs["json"]["dados_merge"]
+        assert all("." not in k for k in merge)
+        assert merge["structured"]["action_items"] == novos_items
+        assert merge["structured"]["title"] == CONV["structured"]["title"]
+
+
+def test_set_postprocessing_status_preserva_siblings_sem_dotkeys():
+    with patch.object(ck, "requests") as rq:
+        conv_com_postprocessing = dict(CONV)
+        conv_com_postprocessing["postprocessing"] = {
+            "status": "not_started",
+            "model": "fal_whisperx",
+            "fail_reason": None,
+            "some_other_field": "keep-me",
+        }
+        rq.request.side_effect = [_resp(conv_com_postprocessing), _resp({"ok": True})]
+        ck.set_postprocessing_status("uid", "conv-1", "completed", fail_reason=None)
+
+        patch_args, patch_kwargs = rq.request.call_args_list[1]
+        assert patch_args[0] == "PATCH"
+        merge = patch_kwargs["json"]["dados_merge"]
+        assert all("." not in k for k in merge)
+        assert "postprocessing" in merge
+        assert merge["postprocessing"]["status"] == "completed"
+        assert merge["postprocessing"]["model"] == "fal_whisperx"
+        assert merge["postprocessing"]["fail_reason"] is None
+        # campo irmão não relacionado, preservado
+        assert merge["postprocessing"]["some_other_field"] == "keep-me"
+
+
+def test_set_postprocessing_status_doc_ausente_nao_faz_patch():
+    with patch.object(ck, "requests") as rq:
+        rq.request.return_value = _resp(None, status=200)
+        rq.request.return_value.json.return_value = None
+        ck.set_postprocessing_status("uid", "conv-1", "completed")
+        # só GET, sem PATCH — doc ausente (None) tolera silenciosamente
+        assert rq.request.call_count == 1
+
+
 def test_footer_rebind():
     """Com CONVERSAS_KARLA=true, conversations.py rebinda pros símbolos do shim."""
     import subprocess

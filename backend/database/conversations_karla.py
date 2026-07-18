@@ -383,7 +383,21 @@ def delete_conversation(uid, conversation_id):
 
 
 def update_conversation_title(uid: str, conversation_id: str, title: str):
-    _patch_merge(conversation_id, {"structured.title": title}, "update_conversation_title")
+    """MERGE RASO trap: `dados_merge` faz merge raso de chaves de TOPO — o
+    memory-service NÃO interpreta notação de ponto (`structured.title` viraria
+    uma chave literal bogus, sem tocar o `structured.title` real). GET doc →
+    merge sob structured.title client-side (preservando os demais sub-campos
+    de structured) → PATCH a chave `structured` inteira."""
+    try:
+        dados = _get(conversation_id)
+    except Exception as e:
+        logger.warning(f"conversas_karla.update_conversation_title: {sanitize(str(e))}")
+        return
+    if dados is None:
+        return
+    structured = dict(dados.get("structured", {}) or {})
+    structured["title"] = title
+    _patch_merge(conversation_id, {"structured": _serializar(structured)}, "update_conversation_title")
 
 
 def update_conversation_status(uid: str, conversation_id: str, status: str):
@@ -407,15 +421,35 @@ def update_conversation_finished_at(uid: str, conversation_id: str, finished_at:
 
 
 def update_conversation_events(uid: str, conversation_id: str, events: List[dict]):
-    _patch_merge(conversation_id, {"structured.events": _serializar(events)}, "update_conversation_events")
+    """MERGE RASO trap (ver update_conversation_title): shallow-merge no serviço
+    → GET+merge no cliente. GET doc → merge sob structured.events → PATCH a
+    chave `structured` inteira, preservando os demais sub-campos."""
+    try:
+        dados = _get(conversation_id)
+    except Exception as e:
+        logger.warning(f"conversas_karla.update_conversation_events: {sanitize(str(e))}")
+        return
+    if dados is None:
+        return
+    structured = dict(dados.get("structured", {}) or {})
+    structured["events"] = _serializar(events)
+    _patch_merge(conversation_id, {"structured": _serializar(structured)}, "update_conversation_events")
 
 
 def update_conversation_action_items(uid: str, conversation_id: str, action_items: List[dict]):
-    _patch_merge(
-        conversation_id,
-        {"structured.action_items": _serializar(action_items)},
-        "update_conversation_action_items",
-    )
+    """MERGE RASO trap (ver update_conversation_title): shallow-merge no serviço
+    → GET+merge no cliente. GET doc → merge sob structured.action_items → PATCH
+    a chave `structured` inteira, preservando os demais sub-campos."""
+    try:
+        dados = _get(conversation_id)
+    except Exception as e:
+        logger.warning(f"conversas_karla.update_conversation_action_items: {sanitize(str(e))}")
+        return
+    if dados is None:
+        return
+    structured = dict(dados.get("structured", {}) or {})
+    structured["action_items"] = _serializar(action_items)
+    _patch_merge(conversation_id, {"structured": _serializar(structured)}, "update_conversation_action_items")
 
 
 def set_postprocessing_status(
@@ -425,17 +459,28 @@ def set_postprocessing_status(
     fail_reason: str = None,
     model=None,
 ):
+    """MERGE RASO trap (ver update_conversation_title): shallow-merge no serviço
+    → GET+merge no cliente. GET doc → merge sob postprocessing.{status,model,
+    fail_reason} → PATCH a chave `postprocessing` inteira, preservando demais
+    sub-campos. Se o doc não existir, loga e retorna silenciosamente (mirror do
+    NotFound tolerance do original)."""
     if model is None:
         model = PostProcessingModel.fal_whisperx
-    _patch_merge(
-        conversation_id,
-        {
-            "postprocessing.status": str(getattr(status, "value", status)),
-            "postprocessing.model": str(getattr(model, "value", model)),
-            "postprocessing.fail_reason": fail_reason,
-        },
-        "set_postprocessing_status",
-    )
+    try:
+        dados = _get(conversation_id)
+    except Exception as e:
+        logger.warning(f"conversas_karla.set_postprocessing_status: {sanitize(str(e))}")
+        return
+    if dados is None:
+        logger.warning(
+            f"conversas_karla.set_postprocessing_status: conversa {sanitize(conversation_id)} não encontrada"
+        )
+        return
+    postprocessing = dict(dados.get("postprocessing", {}) or {})
+    postprocessing["status"] = str(getattr(status, "value", status))
+    postprocessing["model"] = str(getattr(model, "value", model))
+    postprocessing["fail_reason"] = fail_reason
+    _patch_merge(conversation_id, {"postprocessing": _serializar(postprocessing)}, "set_postprocessing_status")
 
 
 def update_conversation_segments(
