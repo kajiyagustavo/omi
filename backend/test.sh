@@ -87,6 +87,7 @@ pytest tests/unit/test_memories_create.py -v
 pytest tests/unit/test_memorias_karla.py -v
 pytest tests/unit/test_conversas_karla.py -v
 pytest tests/unit/test_chat_karla.py -v
+pytest tests/unit/test_omi_docs_shims_karla.py -v
 pytest tests/unit/test_vector_db_ns1_karla.py -v
 pytest tests/unit/test_memory_source.py -v
 pytest tests/unit/test_derive_memory_source.py -v
