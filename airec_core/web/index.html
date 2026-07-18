@@ -894,11 +894,13 @@ async function loadJournal(){
   if (!journalData){
     main.innerHTML = '<div class="loading">Carregando jornal…</div>';
     try {
-      const [convos, mems, tasksR, dailyR] = await Promise.all([
+      const ativDe = new Date(); ativDe.setDate(ativDe.getDate()-60);
+      const [convos, mems, tasksR, dailyR, ativR] = await Promise.all([
         (await api('/v1/conversations?limit=300')).json(),
         (await api('/v3/memories?limit=5000')).json(),
         (await api('/v1/action-items?limit=500')).json(),
         (await api('/v1/users/daily-summaries?limit=60')).json().catch(()=>({summaries:[]})),
+        (await api(`/v1/journal/atividades?de=${encodeURIComponent(ativDe.toISOString())}&ate=${encodeURIComponent(new Date().toISOString())}`)).json().catch(()=>({notas:[]})),
       ]);
       const tasks = Array.isArray(tasksR) ? tasksR : (tasksR.action_items||[]);
       const byDay = (arr, dateFn) => { const m={}; for(const x of arr){ const d=dateFn(x); if(!d)continue; const k=dayKey(d); (m[k]=m[k]||[]).push(x);} return m; };
@@ -921,10 +923,11 @@ async function loadJournal(){
         mems: byDay(mems, m=>m.created_at),
         tasks: byDay(tasks, t=>t.completed_at||t.created_at),
         events: byDay(events, e=>evStart(e)),
+        ativs: byDay(ativR.notas||[], n=>n.criado_em),
         native,
         allDays: new Set(),
       };
-      [journalData.convos, journalData.mems, journalData.tasks].forEach(idx=>Object.keys(idx).forEach(k=>journalData.allDays.add(k)));
+      [journalData.convos, journalData.mems, journalData.tasks, journalData.ativs].forEach(idx=>Object.keys(idx).forEach(k=>journalData.allDays.add(k)));
       Object.keys(native).forEach(k=>journalData.allDays.add(k));
       Object.keys(journalData.events).forEach(k=>journalData.allDays.add(k));
     } catch(e){ main.innerHTML = `<div class="empty">Erro ao carregar jornal: ${e.message}</div>`; return; }
@@ -986,6 +989,7 @@ function renderJournal(){
   const mems = journalData.mems[selectedDay]||[];
   const tasks = journalData.tasks[selectedDay]||[];
   const events = (journalData.events||{})[selectedDay]||[];
+  const ativs = (journalData.ativs||{})[selectedDay]||[];
   const lbl = selectedDay ? new Date(selectedDay+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'long',day:'2-digit',month:'long',year:'numeric'}) : '';
   let j = `<h2 class="journal-day-title">${lbl}</h2>`;
 
@@ -1005,8 +1009,13 @@ function renderJournal(){
     j += `</div>`;
   }
 
-  if (!convos.length && !mems.length && !tasks.length && !events.length){
+  if (!convos.length && !mems.length && !tasks.length && !events.length && !ativs.length){
     j += `<div class="empty">Nada registrado neste dia.</div>`;
+  }
+  if (ativs.length){
+    j += `<div class="journal-sec"><h3>🧠 Memória unificada (${ativs.length})</h3>`;
+    for (const n of ativs){ j += `<div class="item mem"><div class="head">${esc(n.tipo||'')} · ${esc(n.area||'')}</div><div class="body"><b>${esc(n.titulo||'(sem título)')}</b></div><div class="date">${fmtDate(n.criado_em)}</div></div>`; }
+    j += `</div>`;
   }
   if (events.length){
     j += `<div class="journal-sec"><h3>📆 Agenda (${events.length})</h3>`;
