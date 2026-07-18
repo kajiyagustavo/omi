@@ -1,9 +1,15 @@
+import logging
 import math
 import os
 from datetime import datetime
 from typing import Dict
 
 import typesense
+
+import database.conversations as conversations_db
+from database import conversations_karla
+
+logger = logging.getLogger(__name__)
 
 # AIREC self-host: Typesense (busca full-text) é opcional. O upstream instancia o
 # client no import e quebra o boot quando TYPESENSE_API_KEY não está definido
@@ -22,6 +28,55 @@ if os.getenv('TYPESENSE_API_KEY'):
 else:
     client = None
 
+# Cap defensivo pra janela de busca client-side (page * per_page) — evita pedir
+# uma lista de ids gigante pra Karla quando o caller pagina muito fundo.
+_MAX_KARLA_SEARCH_WINDOW = 100
+
+
+def _search_conversations_karla_fallback(
+    uid: str,
+    query: str,
+    page: int,
+    per_page: int,
+    start_date: int = None,
+    end_date: int = None,
+) -> Dict:
+    """AIREC self-host sem Typesense: busca semântica via MEMÓRIA UNIFICADA
+    (Karla). Paginação client-side sobre a lista de ids rankeados — a Karla não
+    tem um endpoint de paginação por página, então buscamos uma janela (cap
+    _MAX_KARLA_SEARCH_WINDOW) e fatiamos localmente."""
+    window = min(page * per_page, _MAX_KARLA_SEARCH_WINDOW)
+    ids = conversations_karla.buscar_conversas_ids(query, starts_at=start_date, ends_at=end_date, k=window)
+
+    start_idx = (page - 1) * per_page
+    end_idx = page * per_page
+    page_ids = ids[start_idx:end_idx]
+
+    docs = conversations_db.get_conversations_by_id(uid, page_ids)
+    docs_by_id = {str(d.get('id')): d for d in docs}
+
+    memories = []
+    for cid in page_ids:
+        doc = docs_by_id.get(cid)
+        if doc is None:
+            continue
+        # Exclude locked conversations entirely to prevent inference leaks (same rule as Typesense path).
+        if doc.get('is_locked', False):
+            continue
+        memories.append(doc)
+
+    # Karla docs já carregam created_at/started_at/finished_at como strings ISO
+    # (ver database/conversations_karla.py) — nada a converter aqui, ao contrário
+    # do caminho Typesense (que guarda unix timestamps).
+
+    has_more = len(ids) > page * per_page or len(ids) >= _MAX_KARLA_SEARCH_WINDOW
+    return {
+        'items': memories,
+        'total_pages': page + 1 if has_more else page,
+        'current_page': page,
+        'per_page': per_page,
+    }
+
 
 def search_conversations(
     uid: str,
@@ -32,6 +87,19 @@ def search_conversations(
     start_date: int = None,
     end_date: int = None,
 ) -> Dict:
+    if client is None:
+        if conversations_karla.is_enabled():
+            return _search_conversations_karla_fallback(
+                uid, query, page, per_page, start_date=start_date, end_date=end_date
+            )
+        logger.warning('busca de conversas desligada (sem Typesense e sem Karla)')
+        return {
+            'items': [],
+            'total_pages': page,
+            'current_page': page,
+            'per_page': per_page,
+        }
+
     try:
 
         filter_by = f'userId:={uid}'
