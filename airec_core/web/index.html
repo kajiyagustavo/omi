@@ -425,12 +425,20 @@ async function loadMemories(){
       allMemories = allMemories.concat(batch);
       allMemories.sort((a,b)=> new Date(b.created_at||0) - new Date(a.created_at||0));
       if (first){ renderMemories(); first = false; }   // pinta a p.1 já no 1º lote
-      else if (document.querySelector('nav button.active')?.dataset.tab==='memories'){ renderMemories(); }
+      // Não repinta a cada lote: o usuário está lendo a página 1 e um innerHTML por
+      // lote (14 no total) trava a rolagem e perde o foco da busca. Só atualiza o
+      // contador; a lista completa aparece quando ele pagina ou busca.
+      else if (document.querySelector('nav button.active')?.dataset.tab==='memories'){
+        const cnt = document.querySelector('.wrap > .count');
+        if (cnt) cnt.textContent = `${memFiltered().length} memória(s) · carregando…`;
+      }
       if (batch.length < CHUNK) break;   // último lote
       offset += CHUNK;
     }
     memLoading = false;
-    if (first) renderMemories();   // caso não tenha vindo nada
+    // Repinta UMA vez no fim, para o contador sair de "carregando…" e a busca
+    // passar a cobrir todas as memórias.
+    if (first || document.querySelector('nav button.active')?.dataset.tab==='memories') renderMemories();
   } catch(e){ memLoading=false; document.getElementById('main').innerHTML = `<div class="empty">Erro: ${e.message}</div>`; }
 }
 
@@ -786,11 +794,23 @@ let convoQuery = '';
 let convoResults = null;      // null = lista normal; array = resultados da busca
 let convoSearching = false;
 
+// Carga progressiva: pinta o 1º lote pequeno (rápido) e completa em segundo plano,
+// em vez de esperar 100 conversas antes de mostrar qualquer coisa.
+const CONVO_CHUNK1 = 20;    // 1º lote — só o que cabe na tela
+const CONVO_CHUNK = 80;     // lotes seguintes, em background
 async function loadConvos(){
+  if (allConvos.length){ renderConvos(); return; }
+  document.getElementById('main').innerHTML = '<div class="loading">Carregando conversas…</div>';
   try {
-    const data = await (await api('/v1/conversations?limit=100')).json();
-    allConvos = Array.isArray(data) ? data : [];
-    renderConvos();
+    const primeiro = await (await api(`/v1/conversations?limit=${CONVO_CHUNK1}&offset=0`)).json();
+    allConvos = Array.isArray(primeiro) ? primeiro : [];
+    renderConvos();                                  // já mostra a tela
+    if (allConvos.length < CONVO_CHUNK1) return;     // acabou no 1º lote
+    const resto = await (await api(`/v1/conversations?limit=${CONVO_CHUNK}&offset=${CONVO_CHUNK1}`)).json();
+    if (Array.isArray(resto) && resto.length){
+      allConvos = allConvos.concat(resto);
+      if (document.querySelector('nav button.active')?.dataset.tab==='convos') renderConvos();
+    }
   } catch(e){ document.getElementById('main').innerHTML = `<div class="empty">Erro: ${e.message}</div>`; }
 }
 
@@ -975,12 +995,15 @@ async function loadJournal(){
     main.innerHTML = '<div class="loading">Carregando jornal…</div>';
     try {
       const ativDe = new Date(); ativDe.setDate(ativDe.getDate()-60);
+      // Paralelo de verdade: o `await api(...)` DENTRO do array executava em série
+      // (cada elemento era avaliado antes do Promise.all receber a lista).
+      // Limites reduzidos ao que o jornal realmente mostra (janela de 60 dias).
       const [convos, mems, tasksR, dailyR, ativR] = await Promise.all([
-        (await api('/v1/conversations?limit=300')).json(),
-        (await api('/v3/memories?limit=5000')).json(),
-        (await api('/v1/action-items?limit=500')).json(),
-        (await api('/v1/users/daily-summaries?limit=60')).json().catch(()=>({summaries:[]})),
-        (await api(`/v1/journal/atividades?de=${encodeURIComponent(ativDe.toISOString())}&ate=${encodeURIComponent(new Date().toISOString())}`)).json().catch(()=>({notas:[]})),
+        api('/v1/conversations?limit=300').then(r=>r.json()).catch(()=>[]),
+        api('/v3/memories?limit=500').then(r=>r.json()).catch(()=>[]),
+        api('/v1/action-items?limit=500').then(r=>r.json()).catch(()=>[]),
+        api('/v1/users/daily-summaries?limit=60').then(r=>r.json()).catch(()=>({summaries:[]})),
+        api(`/v1/journal/atividades?de=${encodeURIComponent(ativDe.toISOString())}&ate=${encodeURIComponent(new Date().toISOString())}`).then(r=>r.json()).catch(()=>({notas:[]})),
       ]);
       const tasks = Array.isArray(tasksR) ? tasksR : (tasksR.action_items||[]);
       const byDay = (arr, dateFn) => { const m={}; for(const x of arr){ const d=dateFn(x); if(!d)continue; const k=dayKey(d); (m[k]=m[k]||[]).push(x);} return m; };
@@ -1323,14 +1346,21 @@ let stgMemos = [];      // memórias [Stargate] p/ o log
 
 async function loadStargate(){
   const main = document.getElementById('main');
-  main.innerHTML = '<div class="loading">Carregando…</div>';
-  // busca as memórias [Stargate] p/ o painel de log
+  // Pinta a home imediatamente; o log de memórias [Stargate] chega depois — ele é
+  // um painel lateral, não deve bloquear a tela inteira.
+  renderStargateHome();
+  if (allMemories.length){   // reusa o que a aba Memórias já carregou
+    stgMemos = allMemories.filter(m=>(m.content||'').startsWith('[Stargate]'))
+                 .sort((a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0));
+    renderStargateHome();
+    return;
+  }
   try {
-    const data = await (await api('/v3/memories?limit=500&offset=0')).json();
+    const data = await (await api('/v3/memories?limit=200&offset=0')).json();
     stgMemos = (Array.isArray(data)?data:[]).filter(m=>(m.content||'').startsWith('[Stargate]'))
                  .sort((a,b)=> new Date(b.created_at||0)-new Date(a.created_at||0));
+    if (document.querySelector('nav button.active')?.dataset.tab==='stargate') renderStargateHome();
   } catch(e){ stgMemos = []; }
-  renderStargateHome();
 }
 
 function renderStargateHome(){
