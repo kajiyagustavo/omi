@@ -18,13 +18,7 @@ JOURNAL_SUMMARIES_COLLECTION = 'journal_summaries'
 
 def get_journal_summary(uid: str, date: str) -> Optional[dict]:
     """Get the stored journal summary for a date (YYYY-MM-DD), or None."""
-    doc = (
-        db.collection('users')
-        .document(uid)
-        .collection(JOURNAL_SUMMARIES_COLLECTION)
-        .document(date)
-        .get()
-    )
+    doc = db.collection('users').document(uid).collection(JOURNAL_SUMMARIES_COLLECTION).document(date).get()
     return doc.to_dict() if doc.exists else None
 
 
@@ -42,3 +36,21 @@ def set_journal_summary(uid: str, date: str, summary: str) -> dict:
 def delete_journal_summary(uid: str, date: str) -> None:
     """Delete the stored journal summary for a date."""
     db.collection('users').document(uid).collection(JOURNAL_SUMMARIES_COLLECTION).document(date).delete()
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.2/F4.4 ────────────────────────────────────
+# Com OMI_DOCS_KARLA=true, journal summaries passam a morar no doc-store
+# genérico do memory-service (via database/journal_summaries_karla). Firestore
+# fica congelado como rollback (desligar a flag reverte tudo). Consumidores
+# importam `database.journal_summaries as journal_summaries_db`, então pegam a
+# versão certa sem mudança nos routers. Rebind explícito função a função.
+import logging as _logging
+import os as _os
+
+if _os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import journal_summaries_karla as _jsk
+
+    get_journal_summary = _jsk.get_journal_summary
+    set_journal_summary = _jsk.set_journal_summary
+    delete_journal_summary = _jsk.delete_journal_summary
+    _logging.getLogger(__name__).warning("journal_summaries: usando MEMÓRIA UNIFICADA (Karla) — OMI_DOCS_KARLA on")
