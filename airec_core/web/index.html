@@ -778,18 +778,79 @@ window.saveTaskEdit = async () => {
   } catch(e){ alert('Falha ao salvar: ' + e.message); loadTasks(); }
 };
 
+let allConvos = [];
+let convoQuery = '';
+let convoResults = null;      // null = lista normal; array = resultados da busca
+let convoSearching = false;
+
 async function loadConvos(){
   try {
     const data = await (await api('/v1/conversations?limit=100')).json();
-    const main = document.getElementById('main');
-    let html = `<div class="wrap"><div class="count">${data.length} conversas</div>`;
-    for (const c of data){
-      const t = c.structured||{};
-      html += `<div class="item mem" onclick="openConvo('${c.id}')"><div class="head">${esc(t.category||c.source||'')}</div><div class="body"><b>${esc(t.title||'(sem título)')}</b><br>${esc(t.overview||'')}</div><div class="date">${fmtDate(c.created_at)}</div></div>`;
-    }
-    html += `</div>`;
-    main.innerHTML = data.length ? html : '<div class="empty">Nenhuma conversa</div>';
+    allConvos = Array.isArray(data) ? data : [];
+    renderConvos();
   } catch(e){ document.getElementById('main').innerHTML = `<div class="empty">Erro: ${e.message}</div>`; }
+}
+
+function convoCard(c){
+  const t = c.structured||{};
+  return `<div class="item mem" onclick="openConvo('${c.id}')"><div class="head">${esc(t.category||c.source||'')}</div><div class="body"><b>${esc(t.title||'(sem título)')}</b><br>${esc(t.overview||'')}</div><div class="date">${fmtDate(c.created_at)}</div></div>`;
+}
+
+function renderConvos(preserveFocus){
+  const main = document.getElementById('main');
+  let html = `<div class="wrap">`;
+  html += `<input class="search" placeholder="Buscar nas conversas (semântica)..." value="${esc(convoQuery)}" oninput="setConvoQuery(this.value)">`;
+  if (convoResults !== null){
+    html += `<div class="count">${convoResults.length} resultado(s) para "${esc(convoQuery)}"</div>`;
+    for (const c of convoResults) html += convoCard(c);
+    if (!convoResults.length) html += '<div class="empty">Nenhuma conversa encontrada</div>';
+  } else {
+    html += `<div class="count">${allConvos.length} conversas</div>`;
+    for (const c of allConvos) html += convoCard(c);
+    if (!allConvos.length) html += '<div class="empty">Nenhuma conversa</div>';
+  }
+  html += `</div>`;
+  main.innerHTML = html;
+  if (preserveFocus){
+    const s = main.querySelector('.search');
+    if (s){ s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+  }
+}
+
+let convoSearchTimer = null;
+window.setConvoQuery = (q) => {
+  convoQuery = q;
+  clearTimeout(convoSearchTimer);
+  convoSearchTimer = setTimeout(()=>{ runConvoSearch(); }, 300);
+};
+
+async function runConvoSearch(){
+  const q = convoQuery.trim();
+  if (q.length < 3){
+    convoResults = null;
+    renderConvos(true);
+    return;
+  }
+  if (convoSearching) return;
+  convoSearching = true;
+  try {
+    const r = await api('/v1/conversations/search', {
+      method: 'POST',
+      body: JSON.stringify({ query: q, page: 1, per_page: 20 }),
+    });
+    const data = await r.json();
+    // só aplica se a query ainda for a atual (evita corrida entre respostas)
+    if (convoQuery.trim() === q){
+      convoResults = Array.isArray(data.items) ? data.items : [];
+      renderConvos(true);
+    }
+  } catch(e){
+    toast('Falha na busca — mostrando lista normal.');
+    convoResults = null;
+    renderConvos(true);
+  } finally {
+    convoSearching = false;
+  }
 }
 
 // ===== AGENDA (Google Calendar) =====
