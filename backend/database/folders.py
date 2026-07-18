@@ -372,3 +372,38 @@ def get_folder_by_category_mapping(uid: str, category_mapping: str) -> Optional[
     """Get a folder by its category_mapping value."""
     folders = get_folders(uid)
     return next((f for f in folders if f.get('category_mapping') == category_mapping), None)
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.2/F4.4 ────────────────────────────────────
+# Com OMI_DOCS_KARLA=true, folders passam a morar no doc-store genérico do
+# memory-service (via database/folders_karla). Firestore fica congelado como
+# rollback (desligar a flag reverte tudo). Consumidores importam
+# `database.folders as folders_db`, então pegam a versão certa sem mudança nos
+# routers. Rebind explícito função a função.
+#
+# Nota: pastas dependem também de `database.conversations` (módulo) pras
+# operações acopladas (delete_folder, move/bulk_move, update_folder_conversation_count)
+# — o shim chama `conversations_db.get_conversations`/`update_conversation` como
+# MÓDULO, então se CONVERSAS_KARLA também estiver ligada, essas chamadas pegam
+# as versões rebindadas (Karla) de conversas automaticamente. O gate desta
+# seção continua sendo OMI_DOCS_KARLA (não CONVERSAS_KARLA) — são flags
+# independentes.
+import logging as _logging
+import os as _os
+
+if _os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import folders_karla as _fk
+
+    get_folders = _fk.get_folders
+    get_folder = _fk.get_folder
+    create_folder = _fk.create_folder
+    update_folder = _fk.update_folder
+    delete_folder = _fk.delete_folder
+    reorder_folders = _fk.reorder_folders
+    initialize_system_folders = _fk.initialize_system_folders
+    get_conversations_in_folder = _fk.get_conversations_in_folder
+    move_conversation_to_folder = _fk.move_conversation_to_folder
+    bulk_move_conversations_to_folder = _fk.bulk_move_conversations_to_folder
+    update_folder_conversation_count = _fk.update_folder_conversation_count
+    get_folder_by_category_mapping = _fk.get_folder_by_category_mapping
+    _logging.getLogger(__name__).warning("folders: usando MEMÓRIA UNIFICADA (Karla) — OMI_DOCS_KARLA on")
