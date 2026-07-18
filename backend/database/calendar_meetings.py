@@ -1,3 +1,5 @@
+import logging as _logging
+import os as _os
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -163,3 +165,24 @@ def get_meetings_in_time_range(uid: str, start_time: datetime, end_time: datetim
         meetings.append(data)
 
     return meetings
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true, as reuniões de calendário passam a morar no
+# doc-store genérico do memory-service (via database/calendar_meetings_karla).
+# Firestore fica congelado como rollback (desligar a flag reverte tudo).
+# Consumidores importam `database.calendar_meetings as calendar_meetings_db`,
+# então pegam a versão certa sem mudança nos routers. Rebind explícito função
+# a função.
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import calendar_meetings_karla as _cmk
+
+    create_meeting = _cmk.create_meeting
+    update_meeting = _cmk.update_meeting
+    get_meeting = _cmk.get_meeting
+    get_meeting_id_by_calendar_event = _cmk.get_meeting_id_by_calendar_event
+    list_meetings = _cmk.list_meetings
+    delete_meeting = _cmk.delete_meeting
+    delete_old_meetings = _cmk.delete_old_meetings
+    get_meetings_in_time_range = _cmk.get_meetings_in_time_range
+    _logging.getLogger(__name__).warning("calendar_meetings: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on")
