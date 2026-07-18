@@ -12,15 +12,32 @@ knowledge_nodes, knowledge_edges) — lidas DIRETO via `database._client.db`.
 (data_protection_level == 'enhanced'), então usa-se
 `database.chat.iter_all_messages(uid)`, que já decripta.
 
+⚠️ Este script exige que `database.chat` esteja em modo Firestore
+(OMI_DOCS_KARLA unset/false) — ele lê Firestore diretamente para as demais
+9 coleções via `database._client.db`, mas `messages` passa por
+`database.chat.iter_all_messages`. Se `OMI_DOCS_KARLA=true` estiver setado
+no ambiente do container, `database.chat` rebinda pra Karla enquanto as
+outras 9 coleções continuam lendo Firestore direto — export misto e
+silenciosamente inconsistente. Este script aborta nesse caso.
+
 Uso: python export_omi_docs_f42.py [uid]
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from typing import Any, Dict, Iterator, Optional, Tuple
 
 sys.path.insert(0, "/app")
+
+if os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    raise SystemExit(
+        "ABORT: OMI_DOCS_KARLA está ligado neste ambiente — este script mistura fontes "
+        "(database.chat rebindaria pra Karla enquanto as outras 9 coleções leem Firestore "
+        "direto via database._client.db). Rode com OMI_DOCS_KARLA unset/false para ler o "
+        "Firestore original em todas as coleções."
+    )
 
 import database.chat as chat_db  # noqa: E402
 from database._client import db  # noqa: E402
