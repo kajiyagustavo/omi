@@ -150,3 +150,24 @@ def get_summaries_count(uid: str) -> int:
     count_query = user_ref.collection(DAILY_SUMMARIES_COLLECTION).count()
     result = count_query.get()
     return result[0][0].value
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.2/F4.4 ────────────────────────────────────
+# Com OMI_DOCS_KARLA=true, daily summaries passam a morar no doc-store genérico
+# do memory-service (via database/daily_summaries_karla). Firestore fica
+# congelado como rollback (desligar a flag reverte tudo). Consumidores importam
+# `database.daily_summaries as daily_summaries_db`, então pegam a versão certa
+# sem mudança nos routers. Rebind explícito função a função.
+import logging as _logging
+import os as _os
+
+if _os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import daily_summaries_karla as _dsk
+
+    create_daily_summary = _dsk.create_daily_summary
+    get_daily_summary = _dsk.get_daily_summary
+    get_daily_summary_by_date = _dsk.get_daily_summary_by_date
+    get_daily_summaries = _dsk.get_daily_summaries
+    delete_daily_summary = _dsk.delete_daily_summary
+    get_summaries_count = _dsk.get_summaries_count
+    _logging.getLogger(__name__).warning("daily_summaries: usando MEMÓRIA UNIFICADA (Karla) — OMI_DOCS_KARLA on")
