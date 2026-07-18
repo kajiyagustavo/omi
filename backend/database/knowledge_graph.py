@@ -239,3 +239,28 @@ def delete_knowledge_graph(uid: str) -> None:
 
     edges_ref = user_ref.collection(knowledge_edges_collection)
     _batch_delete(edges_ref)
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.2/F4.4 ────────────────────────────────────
+# Com OMI_DOCS_KARLA=true, os nós/arestas do grafo de conhecimento (Firestore)
+# passam a morar no doc-store genérico do memory-service (via
+# database/knowledge_graph_karla). Firestore fica congelado como rollback
+# (desligar a flag reverte tudo). Consumidores importam
+# `database.knowledge_graph as kg_db`, então pegam a versão certa sem mudança
+# nos routers. Rebind explícito função a função — só as funções Firestore
+# (a parte NEO4J deste arquivo, se houver, NÃO é tocada).
+import logging as _logging
+import os as _os
+
+if _os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import knowledge_graph_karla as _kgk
+
+    get_knowledge_nodes = _kgk.get_knowledge_nodes
+    get_knowledge_node = _kgk.get_knowledge_node
+    upsert_knowledge_node = _kgk.upsert_knowledge_node
+    find_node_by_label_or_alias = _kgk.find_node_by_label_or_alias
+    get_knowledge_edges = _kgk.get_knowledge_edges
+    upsert_knowledge_edge = _kgk.upsert_knowledge_edge
+    get_knowledge_graph = _kgk.get_knowledge_graph
+    delete_knowledge_graph = _kgk.delete_knowledge_graph
+    _logging.getLogger(__name__).warning("knowledge_graph: usando MEMÓRIA UNIFICADA (Karla) — OMI_DOCS_KARLA on")
