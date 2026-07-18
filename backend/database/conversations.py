@@ -1040,3 +1040,49 @@ def get_last_completed_conversation(uid: str) -> Optional[dict]:
     conversations = [doc.to_dict() for doc in query.stream()]
     conversation = conversations[0] if conversations else None
     return conversation
+
+
+# ── MEMÓRIA UNIFICADA (F4.1) ──────────────────────────────────────────────────
+# Com CONVERSAS_KARLA=true, as conversas moram na Karla (memory-service, REST
+# /u/<token>/conversas-omi). Firestore fica congelado como rollback (desligar a
+# flag reverte tudo). Consumidores importam `database.conversations`, então
+# pegam a versão certa sem mudança nos routers. Rebind explícito função a função.
+import os as _os
+
+if _os.getenv("CONVERSAS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import conversations_karla as _ck
+
+    upsert_conversation = _ck.upsert_conversation
+    get_conversation = _ck.get_conversation
+    get_conversations = _ck.get_conversations
+    get_conversations_without_photos = _ck.get_conversations_without_photos
+    get_conversations_count = _ck.get_conversations_count
+    get_conversations_by_id = _ck.get_conversations_by_id
+    iter_all_conversations = _ck.iter_all_conversations
+    update_conversation = _ck.update_conversation
+    delete_conversation = _ck.delete_conversation
+    update_conversation_title = _ck.update_conversation_title
+    update_conversation_status = _ck.update_conversation_status
+    update_conversation_finished_at = _ck.update_conversation_finished_at
+    set_conversation_as_discarded = _ck.set_conversation_as_discarded
+    set_conversation_visibility = _ck.set_conversation_visibility
+    set_conversation_starred = _ck.set_conversation_starred
+    update_conversation_events = _ck.update_conversation_events
+    update_conversation_action_items = _ck.update_conversation_action_items
+    set_postprocessing_status = _ck.set_postprocessing_status
+    update_conversation_segments = _ck.update_conversation_segments
+    update_conversation_segment_text = _ck.update_conversation_segment_text
+    unlock_all_conversations = _ck.unlock_all_conversations
+    get_in_progress_conversation = _ck.get_in_progress_conversation
+    get_processing_conversations = _ck.get_processing_conversations
+    get_last_completed_conversation = _ck.get_last_completed_conversation
+    get_closest_conversation_to_timestamps = _ck.get_closest_conversation_to_timestamps
+    get_action_items = _ck.get_action_items
+    get_conversation_photos = _ck.get_conversation_photos
+    store_conversation_photos = _ck.store_conversation_photos
+    delete_conversation_photos = _ck.delete_conversation_photos
+    store_model_segments_result = _ck.store_model_segments_result
+    store_model_emotion_predictions_result = _ck.store_model_emotion_predictions_result
+    get_conversation_transcripts_by_model = _ck.get_conversation_transcripts_by_model
+    create_audio_files_from_chunks = _ck.create_audio_files_from_chunks
+    logger.warning("conversations: usando MEMÓRIA UNIFICADA (Karla) — CONVERSAS_KARLA on")
