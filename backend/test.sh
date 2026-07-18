@@ -90,6 +90,7 @@ pytest tests/unit/test_chat_karla.py -v
 pytest tests/unit/test_folders_karla.py -v
 pytest tests/unit/test_omi_docs_shims_karla.py -v
 pytest tests/unit/test_users_karla.py -v
+pytest tests/unit/test_config_shims_karla.py -v
 pytest tests/unit/test_vector_db_ns1_karla.py -v
 pytest tests/unit/test_export_f41.py -v
 pytest tests/unit/test_memory_source.py -v
