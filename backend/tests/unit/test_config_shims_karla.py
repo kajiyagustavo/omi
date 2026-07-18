@@ -571,6 +571,47 @@ def test_search_apps_installed_apps_filtra_por_ids():
         assert {a['id'] for a in result} == {"enabled-1", "enabled-2"}
 
 
+def test_search_apps_installed_apps_mais_de_30_nao_re_filtra_apps_do_usuario():
+    """Mirror do original (database/apps.py:140-154): com > 30 enabled_app_ids,
+    category/capability só se aplicam à base approved+public — os apps
+    instalados do PRÓPRIO usuário são somados sem re-filtrar por category/
+    capability. Um app instalado do usuário com category diferente do filtro
+    deve ser MANTIDO no resultado (não descartado como no bug do shim)."""
+    enabled_ids = [f"public-{i}" for i in range(31)] + ["mine-other-category"]
+    apps = [_app_doc(app_id, category="productivity") for app_id in enabled_ids if app_id.startswith("public-")]
+    # App instalado do próprio usuário, categoria DIFERENTE do filtro aplicado.
+    apps.append(
+        _app_doc(
+            "mine-other-category",
+            uid="uid-owner",
+            approved=False,
+            private=True,
+            category="social",
+        )
+    )
+    # App aprovado/público mas de categoria diferente — deve ser excluído (é
+    # da base, sujeita ao filtro de category).
+    apps.append(_app_doc("public-wrong-category", category="social"))
+
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.search_apps_db(
+            uid="uid-owner",
+            category="productivity",
+            installed_apps=True,
+            enabled_app_ids=enabled_ids,
+        )
+        result_ids = {a['id'] for a in result}
+
+        # Apps públicos aprovados batendo a category permanecem.
+        assert {f"public-{i}" for i in range(31)} <= result_ids
+        # App do usuário com category diferente é MANTIDO (paridade com o
+        # original — não é re-filtrado por category/capability).
+        assert "mine-other-category" in result_ids
+        # App público de categoria errada (da base) continua excluído.
+        assert "public-wrong-category" not in result_ids
+
+
 # ── get_public_approved_apps_db / get_private_apps_db: filtro client-side ─────
 
 

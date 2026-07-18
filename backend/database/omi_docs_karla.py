@@ -9,7 +9,10 @@ Firestore pra chamadas aqui.
 
 Coleções válidas: messages, chat_files, chat_sessions, daily_summaries,
 journal_summaries, folders, goals, goal_history, knowledge_nodes,
-knowledge_edges.
+knowledge_edges — mais as 11 coleções acrescentadas na F4.5: users, people,
+integrations, task_integrations, fcm_tokens, hourly_usage, llm_usage, apps,
+meetings, dev_api_keys, mcp_api_keys (allowlist server-side já estendida no
+memory-service).
 
 ⚠️ Trap do merge RASO: `patch()` (dados_merge) substitui chaves de TOPO por
 inteiro — não faz deep-merge nem interpreta notação de ponto. Qualquer atualização
