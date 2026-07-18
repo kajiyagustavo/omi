@@ -1,3 +1,5 @@
+import logging as _logging
+import os as _os
 import uuid
 from datetime import datetime
 from typing import List, Optional, Tuple
@@ -132,3 +134,20 @@ def get_user_and_scopes_by_api_key(api_key: str) -> Optional[dict]:
         key_ref.update({"last_used_at": datetime.utcnow()})
 
     return {"user_id": user_id, "scopes": scopes}
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true, as Developer API keys passam a morar no doc-store
+# genérico do memory-service (via database/dev_api_key_karla). Firestore fica
+# congelado como rollback (desligar a flag reverte tudo). Consumidores
+# importam `database.dev_api_key as dev_api_key_db`, então pegam a versão
+# certa sem mudança nos routers. Rebind explícito função a função.
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import dev_api_key_karla as _dak
+
+    create_dev_key = _dak.create_dev_key
+    get_dev_keys_for_user = _dak.get_dev_keys_for_user
+    delete_dev_key = _dak.delete_dev_key
+    get_user_id_by_api_key = _dak.get_user_id_by_api_key
+    get_user_and_scopes_by_api_key = _dak.get_user_and_scopes_by_api_key
+    _logging.getLogger(__name__).warning("dev_api_key: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on")
