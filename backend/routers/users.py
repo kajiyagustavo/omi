@@ -78,6 +78,7 @@ from utils.subscription import (
     legacy_plan_features,
 )
 from database import user_usage as user_usage_db
+from utils import memoria_unificada
 from utils import stripe as stripe_utils
 from utils.log_sanitizer import sanitize
 from utils.llm.followup import followup_question_prompt
@@ -1089,6 +1090,16 @@ class DailySummarySettingsResponse(BaseModel):
 class DailySummarySettingsUpdate(BaseModel):
     enabled: Optional[bool] = None
     hour: Optional[int] = None  # Local hour (0-23), e.g., 22 for 10 PM, 8 for 8 AM
+
+
+@router.get('/v1/journal/atividades', tags=['v1'])
+def get_journal_atividades(de: str, ate: str, uid: str = Depends(auth.get_current_user_uid)):
+    """Atividades registradas na MEMÓRIA UNIFICADA (Karla) na janela dada —
+    sessões de trabalho com IA/ferramentas (F2). Alimenta a seção "memória
+    unificada" do jornal na web UI. Janelas ISO 8601; lista vazia se a
+    memória unificada não estiver configurada ou indisponível."""
+    notas = memoria_unificada.notas_do_dia(de, ate)
+    return {'notas': notas or []}
 
 
 @router.get('/v1/users/daily-summary-settings', tags=['v1'], response_model=DailySummarySettingsResponse)
