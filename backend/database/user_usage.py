@@ -1,3 +1,5 @@
+import logging as _logging
+import os as _os
 from calendar import monthrange
 from datetime import datetime, timezone
 from typing import Optional
@@ -334,3 +336,28 @@ def get_current_user_usage(uid: str, period: str) -> dict:
         response['history'] = get_yearly_history(uid)
 
     return response
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true, os buckets horários de usage passam a morar no
+# doc-store genérico do memory-service (via database/user_usage_karla).
+# Firestore fica congelado como rollback (desligar a flag reverte tudo).
+# Consumidores importam `database.user_usage as user_usage_db`, então pegam a
+# versão certa sem mudança nos routers. Rebind explícito função a função.
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import user_usage_karla as _uuk
+
+    get_monthly_chat_usage = _uuk.get_monthly_chat_usage
+    update_hourly_usage = _uuk.update_hourly_usage
+    batch_update_hourly_usage = _uuk.batch_update_hourly_usage
+    get_today_usage_stats = _uuk.get_today_usage_stats
+    get_monthly_usage_stats = _uuk.get_monthly_usage_stats
+    get_monthly_usage_stats_since = _uuk.get_monthly_usage_stats_since
+    get_yearly_usage_stats = _uuk.get_yearly_usage_stats
+    get_all_time_usage_stats = _uuk.get_all_time_usage_stats
+    get_hourly_history_for_today = _uuk.get_hourly_history_for_today
+    get_daily_history_for_month = _uuk.get_daily_history_for_month
+    get_monthly_history_for_year = _uuk.get_monthly_history_for_year
+    get_yearly_history = _uuk.get_yearly_history
+    get_current_user_usage = _uuk.get_current_user_usage
+    _logging.getLogger(__name__).warning("user_usage: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on")
