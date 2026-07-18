@@ -517,3 +517,48 @@ def delete_api_key_db(app_id: str, key_id: str):
     api_key_ref = db.collection(apps_collection).document(app_id).collection('api_keys').document(key_id)
     api_key_ref.delete()
     return True
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true, o doc CANÔNICO de app (`plugins_data`, doc_id = app id)
+# passa a morar no doc-store genérico do memory-service (via database/apps_karla),
+# na coleção allowlisted `apps`. Firestore fica congelado como rollback (desligar
+# a flag reverte tudo). Consumidores importam `database.apps as apps_db` (ou
+# funções nomeadas direto deste módulo), então pegam a versão certa sem mudança
+# nos routers/utils. Rebind explícito função a função — SOMENTE as shimadas.
+#
+# EXCLUÍDAS do rebind (ficam no Firestore, sem shim — fora do escopo desta
+# task, sem coleção equivalente allowlisted na Karla):
+#   get_audio_apps_count, get_unapproved_public_apps_db, get_popular_apps_db,
+#   get_public_unapproved_apps_db, get_apps_for_tester_db, upsert_app_to_db,
+#   get_app_usage_history_db, get_app_memory_created_integration_usage_count_db,
+#   get_app_memory_prompt_usage_count_db, get_app_chat_message_sent_usage_count_db,
+#   get_app_usage_count_db, record_app_usage (usage_history);
+#   set_app_review_in_db (reviews);
+#   add_tester_db, add_app_access_for_tester_db, remove_app_access_for_tester_db,
+#   remove_tester_db, can_tester_access_app_db, is_tester_db (testers);
+#   delete_persona_db, get_personas_by_username_db, get_persona_by_username_db,
+#   get_persona_by_id_db, get_persona_by_uid_db, get_user_persona_by_uid,
+#   get_persona_by_twitter_handle_db, get_persona_by_username_twitter_handle_db,
+#   get_omi_personas_by_uid_db, get_omi_persona_apps_by_uid_db,
+#   update_persona_in_db, migrate_app_owner_id_db (personas);
+#   change_app_approval_status (aprovação);
+#   create_api_key_db, get_api_key_by_hash_db, list_api_keys_db,
+#   delete_api_key_db (api_keys de app);
+#   payments (upsert_app_payment_link e afins vivem em outro módulo, não aqui).
+import os as _os
+
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import apps_karla as _appsk
+
+    get_app_by_id_db = _appsk.get_app_by_id_db
+    get_public_approved_apps_db = _appsk.get_public_approved_apps_db
+    get_private_apps_db = _appsk.get_private_apps_db
+    search_apps_db = _appsk.search_apps_db
+    add_app_to_db = _appsk.add_app_to_db
+    update_app_in_db = _appsk.update_app_in_db
+    delete_app_from_db = _appsk.delete_app_from_db
+    update_app_visibility_in_db = _appsk.update_app_visibility_in_db
+    set_app_popular_db = _appsk.set_app_popular_db
+
+    logger.warning("apps: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on (shim parcial)")
