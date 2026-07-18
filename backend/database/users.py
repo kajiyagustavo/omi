@@ -1360,3 +1360,93 @@ def update_ai_user_profile(
     user_ref = db.collection('users').document(uid)
     user_ref.update({'ai_user_profile': existing})
     return existing
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true, a config do usuário (doc raiz `users`, `people`,
+# `integrations`, `task_integrations`) passa a morar no doc-store genérico do
+# memory-service (via database/users_karla). Firestore fica congelado como
+# rollback (desligar a flag reverte tudo). Consumidores importam `database.users
+# as users_db`, então pegam a versão certa sem mudança nos routers. Rebind
+# explícito função a função.
+#
+# EXCLUÍDAS do rebind (ficam no Firestore, sem equivalente na Karla):
+#   delete_user_data, set_migration_status, finalize_migration,
+#   get_user_by_stripe_customer_id; pagamentos (get/set_stripe_connect_account_id,
+#   set/get_paypal_payment_details, set/get_default_payment_method,
+#   get/set_stripe_customer_id); analytics/ratings (set/get_conversation_summary_
+#   rating_score, set_chat_message_rating_score, get_all_ratings).
+import os as _os
+
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import users_karla as _usersk
+
+    # doc raiz (users)
+    record_user_platform = _usersk.record_user_platform
+    is_exists_user = _usersk.is_exists_user
+    get_user_profile = _usersk.get_user_profile
+    get_user_store_recording_permission = _usersk.get_user_store_recording_permission
+    set_user_store_recording_permission = _usersk.set_user_store_recording_permission
+    get_user_private_cloud_sync_enabled = _usersk.get_user_private_cloud_sync_enabled
+    set_user_private_cloud_sync_enabled = _usersk.set_user_private_cloud_sync_enabled
+    set_user_cancellation_feedback = _usersk.set_user_cancellation_feedback
+    get_byok_state = _usersk.get_byok_state
+    is_byok_active = _usersk.is_byok_active
+    set_byok_active = _usersk.set_byok_active
+    clear_byok_active = _usersk.clear_byok_active
+    set_user_deletion_feedback = _usersk.set_user_deletion_feedback
+    set_user_speaker_embedding = _usersk.set_user_speaker_embedding
+    get_user_speaker_embedding = _usersk.get_user_speaker_embedding
+    get_data_protection_level = _usersk.get_data_protection_level
+    set_data_protection_level = _usersk.set_data_protection_level
+    get_user_language_preference = _usersk.get_user_language_preference
+    set_user_language_preference = _usersk.set_user_language_preference
+    get_user_onboarding_state = _usersk.get_user_onboarding_state
+    set_user_onboarding_state = _usersk.set_user_onboarding_state
+    update_user_subscription = _usersk.update_user_subscription
+    get_user_subscription = _usersk.get_user_subscription
+    get_user_valid_subscription = _usersk.get_user_valid_subscription
+    get_user_training_data_opt_in = _usersk.get_user_training_data_opt_in
+    set_user_training_data_opt_in = _usersk.set_user_training_data_opt_in
+    get_user_transcription_preferences = _usersk.get_user_transcription_preferences
+    set_user_transcription_preferences = _usersk.set_user_transcription_preferences
+    get_agent_vm = _usersk.get_agent_vm
+    get_notification_settings = _usersk.get_notification_settings
+    update_notification_settings = _usersk.update_notification_settings
+    get_assistant_settings = _usersk.get_assistant_settings
+    update_assistant_settings = _usersk.update_assistant_settings
+    get_ai_user_profile = _usersk.get_ai_user_profile
+    update_ai_user_profile = _usersk.update_ai_user_profile
+
+    # people
+    create_person = _usersk.create_person
+    get_person = _usersk.get_person
+    get_people = _usersk.get_people
+    get_person_by_name = _usersk.get_person_by_name
+    get_people_by_ids = _usersk.get_people_by_ids
+    update_person = _usersk.update_person
+    delete_person = _usersk.delete_person
+    add_person_speech_sample = _usersk.add_person_speech_sample
+    get_person_speech_samples_count = _usersk.get_person_speech_samples_count
+    remove_person_speech_sample = _usersk.remove_person_speech_sample
+    set_person_speaker_embedding = _usersk.set_person_speaker_embedding
+    get_person_speaker_embedding = _usersk.get_person_speaker_embedding
+    set_person_speech_sample_transcript = _usersk.set_person_speech_sample_transcript
+    update_person_speech_samples_after_migration = _usersk.update_person_speech_samples_after_migration
+    clear_person_speaker_embedding = _usersk.clear_person_speaker_embedding
+    update_person_speech_samples_version = _usersk.update_person_speech_samples_version
+
+    # integrations
+    get_integration = _usersk.get_integration
+    set_integration = _usersk.set_integration
+    delete_integration = _usersk.delete_integration
+
+    # task_integrations
+    get_task_integrations = _usersk.get_task_integrations
+    get_task_integration = _usersk.get_task_integration
+    set_task_integration = _usersk.set_task_integration
+    delete_task_integration = _usersk.delete_task_integration
+    get_default_task_integration = _usersk.get_default_task_integration
+    set_default_task_integration = _usersk.set_default_task_integration
+
+    logger.warning("users: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on")
