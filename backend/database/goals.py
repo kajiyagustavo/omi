@@ -168,3 +168,27 @@ def delete_goal(uid: str, goal_id: str) -> bool:
 
     goal_ref.delete()
     return True
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.2/F4.4 ────────────────────────────────────
+# Com OMI_DOCS_KARLA=true, goals + goal_history passam a morar no doc-store
+# genérico do memory-service (via database/goals_karla). Firestore fica
+# congelado como rollback (desligar a flag reverte tudo). Consumidores importam
+# `database.goals as goals_db`, então pegam a versão certa sem mudança nos
+# routers. Rebind explícito função a função.
+import logging as _logging
+import os as _os
+
+if _os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import goals_karla as _gk
+
+    get_user_goal = _gk.get_user_goal
+    get_user_goals = _gk.get_user_goals
+    create_goal = _gk.create_goal
+    update_goal = _gk.update_goal
+    update_goal_progress = _gk.update_goal_progress
+    save_goal_progress_history = _gk.save_goal_progress_history
+    get_goal_history = _gk.get_goal_history
+    get_all_goals = _gk.get_all_goals
+    delete_goal = _gk.delete_goal
+    _logging.getLogger(__name__).warning("goals: usando MEMÓRIA UNIFICADA (Karla) — OMI_DOCS_KARLA on")
