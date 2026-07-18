@@ -5,6 +5,8 @@ Stores and queries LLM token usage by feature in Firestore.
 Schema: users/{uid}/llm_usage/{date} -> {feature -> {model -> {input_tokens, output_tokens}}}
 """
 
+import logging as _logging
+import os as _os
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -288,3 +290,24 @@ def get_total_llm_cost(uid: str, bucket: str = 'desktop_chat') -> float:
         if isinstance(dc, dict):
             total += dc.get('cost_usd', 0.0)
     return round(total, 6)
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true, o usage de LLM passa a morar no doc-store genérico do
+# memory-service (via database/llm_usage_karla). Firestore fica congelado como
+# rollback (desligar a flag reverte tudo). Consumidores importam
+# `database.llm_usage as llm_usage_db`, então pegam a versão certa sem mudança
+# nos routers. Rebind explícito função a função.
+#
+# EXCLUÍDA do rebind: get_global_top_features (collection-group cross-user —
+# ver docstring de llm_usage_karla.py).
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import llm_usage_karla as _luk
+
+    record_llm_usage = _luk.record_llm_usage
+    get_daily_usage = _luk.get_daily_usage
+    get_usage_summary = _luk.get_usage_summary
+    get_top_features = _luk.get_top_features
+    record_llm_usage_bucket = _luk.record_llm_usage_bucket
+    get_total_llm_cost = _luk.get_total_llm_cost
+    _logging.getLogger(__name__).warning("llm_usage: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on")
