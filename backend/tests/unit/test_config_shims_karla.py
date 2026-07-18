@@ -6,6 +6,7 @@ mesmo padrão em todo o arquivo, novas seções devem reusar os fixtures daqui e
 vez de duplicar o boilerplate de stub.
 """
 
+import json
 import os
 import sys
 import types
@@ -53,6 +54,16 @@ from database import omi_docs_karla as odk  # noqa: E402
 from database import apps as apps_mod  # noqa: E402
 from database import apps_karla as ak  # noqa: E402
 from database.cache_manager import InMemoryCacheManager  # noqa: E402
+from database import user_usage as user_usage_mod  # noqa: E402
+from database import user_usage_karla as uuk  # noqa: E402
+from database import llm_usage as llm_usage_mod  # noqa: E402
+from database import llm_usage_karla as luk  # noqa: E402
+from database import dev_api_key as dev_api_key_mod  # noqa: E402
+from database import dev_api_key_karla as dak  # noqa: E402
+from database import mcp_api_key as mcp_api_key_mod  # noqa: E402
+from database import mcp_api_key_karla as mak  # noqa: E402
+from database import calendar_meetings as calendar_meetings_mod  # noqa: E402
+from database import calendar_meetings_karla as cmk  # noqa: E402
 
 
 def _fake_cache():
@@ -774,3 +785,277 @@ def test_apps_footer_rebind_parcial():
     # NÃO shimada — permanece Firestore, sem rebind pro módulo apps_karla.
     assert apps_mod.set_app_review_in_db is not getattr(ak, "set_app_review_in_db", None)
     assert not hasattr(ak, "set_app_review_in_db")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── user_usage_karla ──────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+import datetime as _dt  # noqa: E402
+
+
+def test_update_hourly_usage_get_merge_soma_contadores():
+    """Increment via GET+merge: doc existente com transcription_seconds=10
+    recebe +5 → grava 15 (soma, não sobrescreve)."""
+    with patch.object(odk, "requests") as rq:
+        rq.request.side_effect = [
+            _resp({"dados": {"transcription_seconds": 10, "words_transcribed": 2}}),  # obter
+            _resp({"dados": {}}),  # patch
+        ]
+        date = _dt.datetime(2026, 7, 14, 9, tzinfo=_dt.timezone.utc)
+        uuk.update_hourly_usage("uid-1", date, {"transcription_seconds": 5})
+
+        patch_call = rq.request.call_args_list[-1]
+        assert patch_call[0][0] == "PATCH"
+        assert patch_call[0][1].endswith("/u/tok-teste/omi-docs/hourly_usage/2026-07-14-09")
+        body = patch_call[1]["json"]["dados_merge"]
+        assert body["transcription_seconds"] == 15
+        assert body["id"] == "2026-07-14-09"
+        assert body["year"] == 2026 and body["hour"] == 9
+
+
+def test_update_hourly_usage_zero_increment_nao_faz_io():
+    with patch.object(odk, "requests") as rq:
+        date = _dt.datetime(2026, 7, 14, 9, tzinfo=_dt.timezone.utc)
+        uuk.update_hourly_usage("uid-1", date, {"transcription_seconds": 0})
+        assert rq.request.call_count == 0
+
+
+def test_get_today_usage_stats_agrega_via_listar_filtro():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp(
+            {"docs": [{"dados": {"transcription_seconds": 5}}, {"dados": {"transcription_seconds": 7}}]}
+        )
+        date = _dt.datetime(2026, 7, 14, tzinfo=_dt.timezone.utc)
+        stats = uuk.get_today_usage_stats("uid-1", date)
+        assert stats["transcription_seconds"] == 12
+
+        list_call = rq.request.call_args_list[0]
+        assert list_call[0][0] == "GET"
+        assert list_call[0][1].endswith("/u/tok-teste/omi-docs/hourly_usage")
+        filtro = json.loads(list_call[1]["params"]["filtro"])
+        assert filtro == {"year": 2026, "month": 7, "day": 14}
+
+
+def test_user_usage_footer_rebind():
+    assert user_usage_mod.update_hourly_usage is uuk.update_hourly_usage
+    assert user_usage_mod.batch_update_hourly_usage is uuk.batch_update_hourly_usage
+    assert user_usage_mod.get_today_usage_stats is uuk.get_today_usage_stats
+    assert user_usage_mod.get_monthly_usage_stats is uuk.get_monthly_usage_stats
+    assert user_usage_mod.get_monthly_usage_stats_since is uuk.get_monthly_usage_stats_since
+    assert user_usage_mod.get_yearly_usage_stats is uuk.get_yearly_usage_stats
+    assert user_usage_mod.get_all_time_usage_stats is uuk.get_all_time_usage_stats
+    assert user_usage_mod.get_hourly_history_for_today is uuk.get_hourly_history_for_today
+    assert user_usage_mod.get_daily_history_for_month is uuk.get_daily_history_for_month
+    assert user_usage_mod.get_monthly_history_for_year is uuk.get_monthly_history_for_year
+    assert user_usage_mod.get_yearly_history is uuk.get_yearly_history
+    assert user_usage_mod.get_current_user_usage is uuk.get_current_user_usage
+    assert user_usage_mod.get_monthly_chat_usage is uuk.get_monthly_chat_usage
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── llm_usage_karla ───────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_record_llm_usage_get_merge_soma_contadores():
+    with patch.object(odk, "requests") as rq:
+        rq.request.side_effect = [
+            _resp({"dados": {"chat": {"gpt-4_1-mini": {"input_tokens": 100, "output_tokens": 50, "call_count": 1}}}}),
+            _resp({"dados": {}}),
+        ]
+        luk.record_llm_usage("uid-1", "chat", "gpt-4.1-mini", 20, 10)
+
+        patch_call = rq.request.call_args_list[-1]
+        assert patch_call[0][0] == "PATCH"
+        body = patch_call[1]["json"]["dados_merge"]
+        model_data = body["chat"]["gpt-4_1-mini"]
+        assert model_data["input_tokens"] == 120
+        assert model_data["output_tokens"] == 60
+        assert model_data["call_count"] == 2
+
+
+def test_record_llm_usage_zero_tokens_nao_faz_io():
+    with patch.object(odk, "requests") as rq:
+        luk.record_llm_usage("uid-1", "chat", "gpt-4.1-mini", 0, 0)
+        assert rq.request.call_count == 0
+
+
+def test_get_daily_usage_read_doc_id_correto():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"dados": {"chat": {}}})
+        date = _dt.datetime(2026, 7, 14, tzinfo=_dt.timezone.utc)
+        result = luk.get_daily_usage("uid-1", date)
+        assert result == {"chat": {}}
+        get_call = rq.request.call_args_list[0]
+        assert get_call[0][1].endswith("/u/tok-teste/omi-docs/llm_usage/2026-07-14")
+
+
+def test_llm_usage_footer_rebind():
+    assert llm_usage_mod.record_llm_usage is luk.record_llm_usage
+    assert llm_usage_mod.get_daily_usage is luk.get_daily_usage
+    assert llm_usage_mod.get_usage_summary is luk.get_usage_summary
+    assert llm_usage_mod.get_top_features is luk.get_top_features
+    assert llm_usage_mod.record_llm_usage_bucket is luk.record_llm_usage_bucket
+    assert llm_usage_mod.get_total_llm_cost is luk.get_total_llm_cost
+
+    # NÃO shimada — cross-user collection-group, permanece Firestore.
+    assert not hasattr(luk, "get_global_top_features")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── dev_api_key_karla ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_create_dev_key_upsert_colecao_doc_id_dados():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"ok": True}, status=201)
+        raw_key, key_data = dak.create_dev_key("uid-1", "minha chave")
+
+        assert raw_key.startswith("omi_dev_")
+        upsert_call = rq.request.call_args_list[0]
+        assert upsert_call[0][0] == "POST"
+        assert upsert_call[0][1].endswith("/u/tok-teste/omi-docs/dev_api_keys")
+        body = upsert_call[1]["json"]
+        assert body["doc_id"] == key_data.id
+        assert body["dados"]["user_id"] == "uid-1"
+        assert body["dados"]["name"] == "minha chave"
+        assert body["dados"]["scopes"]  # default READ_ONLY_SCOPES
+
+
+def test_get_user_and_scopes_by_api_key_cache_hit_nao_faz_io():
+    with patch.object(dak.redis_db, "get_cached_dev_api_key_data", return_value={"user_id": "uid-1", "scopes": None}):
+        with patch.object(odk, "requests") as rq:
+            result = dak.get_user_and_scopes_by_api_key("omi_dev_" + "a" * 32)
+            assert result == {"user_id": "uid-1", "scopes": None}
+            assert rq.request.call_count == 0
+
+
+def test_get_user_and_scopes_by_api_key_cache_miss_busca_karla_e_seta_cache():
+    with patch.object(dak.redis_db, "get_cached_dev_api_key_data", return_value=None):
+        with patch.object(dak.redis_db, "cache_dev_api_key") as cache_set:
+            with patch.object(odk, "requests") as rq:
+                rq.request.side_effect = [
+                    _resp(
+                        {
+                            "docs": [
+                                {"dados": {"id": "key-1", "user_id": "uid-1", "hashed_key": "hash-x", "scopes": ["a"]}}
+                            ]
+                        }
+                    ),  # listar filtro hashed_key
+                    _resp({"dados": {}}, status=200),  # patch last_used_at
+                ]
+                result = dak.get_user_and_scopes_by_api_key("omi_dev_" + "a" * 32)
+                assert result["user_id"] == "uid-1"
+                cache_set.assert_called_once()
+
+                patch_call = rq.request.call_args_list[-1]
+                assert patch_call[0][0] == "PATCH"
+                assert patch_call[0][1].endswith("/u/tok-teste/omi-docs/dev_api_keys/key-1")
+
+
+def test_dev_api_key_footer_rebind():
+    assert dev_api_key_mod.create_dev_key is dak.create_dev_key
+    assert dev_api_key_mod.get_dev_keys_for_user is dak.get_dev_keys_for_user
+    assert dev_api_key_mod.delete_dev_key is dak.delete_dev_key
+    assert dev_api_key_mod.get_user_id_by_api_key is dak.get_user_id_by_api_key
+    assert dev_api_key_mod.get_user_and_scopes_by_api_key is dak.get_user_and_scopes_by_api_key
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── mcp_api_key_karla ─────────────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_create_mcp_key_upsert_colecao_doc_id_dados():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"ok": True}, status=201)
+        raw_key, key_data = mak.create_mcp_key("uid-1", "minha chave mcp")
+
+        assert raw_key.startswith("omi_mcp_")
+        upsert_call = rq.request.call_args_list[0]
+        assert upsert_call[0][0] == "POST"
+        assert upsert_call[0][1].endswith("/u/tok-teste/omi-docs/mcp_api_keys")
+        body = upsert_call[1]["json"]
+        assert body["doc_id"] == key_data.id
+        assert body["dados"]["user_id"] == "uid-1"
+
+
+def test_get_user_id_by_api_key_cache_miss_busca_karla_e_seta_cache():
+    secret_part = "b" * 32
+    expected_hash = mak.hash_api_key(secret_part)
+    with patch.object(mak.redis_db, "get_cached_mcp_api_key_user_id", return_value=None):
+        with patch.object(mak.redis_db, "cache_mcp_api_key") as cache_set:
+            with patch.object(odk, "requests") as rq:
+                rq.request.side_effect = [
+                    _resp({"docs": [{"dados": {"id": "key-1", "user_id": "uid-1", "hashed_key": expected_hash}}]}),
+                    _resp({"dados": {}}, status=200),  # patch last_used_at
+                ]
+                result = mak.get_user_id_by_api_key("omi_mcp_" + secret_part)
+                assert result == "uid-1"
+                cache_set.assert_called_once_with(expected_hash, "uid-1")
+
+
+def test_mcp_api_key_footer_rebind():
+    assert mcp_api_key_mod.create_mcp_key is mak.create_mcp_key
+    assert mcp_api_key_mod.get_mcp_keys_for_user is mak.get_mcp_keys_for_user
+    assert mcp_api_key_mod.delete_mcp_key is mak.delete_mcp_key
+    assert mcp_api_key_mod.get_user_id_by_api_key is mak.get_user_id_by_api_key
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── calendar_meetings_karla ───────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def test_create_meeting_upsert_colecao_doc_id_dados():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"ok": True}, status=201)
+        meeting_id = cmk.create_meeting("uid-1", {"title": "Standup", "start_time": "2026-07-14T09:00:00+00:00"})
+
+        upsert_call = rq.request.call_args_list[0]
+        assert upsert_call[0][0] == "POST"
+        assert upsert_call[0][1].endswith("/u/tok-teste/omi-docs/meetings")
+        body = upsert_call[1]["json"]
+        assert body["doc_id"] == meeting_id
+        assert body["dados"]["id"] == meeting_id
+        assert body["dados"]["title"] == "Standup"
+
+
+def test_get_meeting_read_injeta_id():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"dados": {"title": "Standup"}})
+        result = cmk.get_meeting("uid-1", "meeting-1")
+        assert result == {"title": "Standup", "id": "meeting-1"}
+        get_call = rq.request.call_args_list[0]
+        assert get_call[0][1].endswith("/u/tok-teste/omi-docs/meetings/meeting-1")
+
+
+def test_get_meeting_ausente_devolve_none():
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp(None, status=404)
+        assert cmk.get_meeting("uid-1", "missing") is None
+
+
+def test_list_meetings_ordena_desc_e_respeita_limit():
+    meetings = [
+        {"id": "m1", "start_time": "2026-07-14T09:00:00+00:00"},
+        {"id": "m2", "start_time": "2026-07-14T11:00:00+00:00"},
+        {"id": "m3", "start_time": "2026-07-14T10:00:00+00:00"},
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": m} for m in meetings]})
+        result = cmk.list_meetings("uid-1", limit=2)
+        assert [m["id"] for m in result] == ["m2", "m3"]
+
+
+def test_calendar_meetings_footer_rebind():
+    assert calendar_meetings_mod.create_meeting is cmk.create_meeting
+    assert calendar_meetings_mod.update_meeting is cmk.update_meeting
+    assert calendar_meetings_mod.get_meeting is cmk.get_meeting
+    assert calendar_meetings_mod.get_meeting_id_by_calendar_event is cmk.get_meeting_id_by_calendar_event
+    assert calendar_meetings_mod.list_meetings is cmk.list_meetings
+    assert calendar_meetings_mod.delete_meeting is cmk.delete_meeting
+    assert calendar_meetings_mod.delete_old_meetings is cmk.delete_old_meetings
+    assert calendar_meetings_mod.get_meetings_in_time_range is cmk.get_meetings_in_time_range
