@@ -85,6 +85,7 @@ pytest tests/unit/test_rate_limiting.py -v
 pytest tests/unit/test_memories_batch.py -v
 pytest tests/unit/test_memories_create.py -v
 pytest tests/unit/test_memorias_karla.py -v
+pytest tests/unit/test_conversas_karla.py -v
 pytest tests/unit/test_memory_source.py -v
 pytest tests/unit/test_derive_memory_source.py -v
 pytest tests/unit/test_memories_source_filter.py -v
