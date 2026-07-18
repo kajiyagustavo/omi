@@ -6,6 +6,7 @@ from typing import List
 
 from pinecone import Pinecone
 
+from database import conversations_karla
 from database import memories_karla
 from utils.llm.clients import embeddings
 import logging
@@ -32,11 +33,19 @@ def _get_data(uid: str, conversation_id: str, vector: List[float]):
 
 
 def upsert_vector(uid: str, conversation_id: str, vector: List[float]):
+    if conversations_karla.is_enabled():
+        logger.debug('upsert_vector no-op — CONVERSAS_KARLA on (embedding/ts é responsabilidade do serviço)')
+        return
+
     res = index.upsert(vectors=[_get_data(uid, conversation_id, vector)], namespace="ns1")
     logger.info(f'upsert_vector {res}')
 
 
 def upsert_vector2(uid: str, conversation_id: str, vector: List[float], metadata: dict):
+    if conversations_karla.is_enabled():
+        logger.debug('upsert_vector2 no-op — CONVERSAS_KARLA on (embedding/ts é responsabilidade do serviço)')
+        return
+
     data = _get_data(uid, conversation_id, vector)
     data['metadata'].update(metadata)
     res = index.upsert(vectors=[data], namespace="ns1")
@@ -44,18 +53,29 @@ def upsert_vector2(uid: str, conversation_id: str, vector: List[float], metadata
 
 
 def update_vector_metadata(uid: str, conversation_id: str, metadata: dict):
+    if conversations_karla.is_enabled():
+        logger.debug('update_vector_metadata no-op — CONVERSAS_KARLA on (embedding/ts é responsabilidade do serviço)')
+        return None
+
     metadata['uid'] = uid
     metadata['memory_id'] = conversation_id
     return index.update(f'{uid}-{conversation_id}', set_metadata=metadata, namespace="ns1")
 
 
 def upsert_vectors(uid: str, vectors: List[List[float]], conversation_ids: List[str]):
+    if conversations_karla.is_enabled():
+        logger.debug('upsert_vectors no-op — CONVERSAS_KARLA on (embedding/ts é responsabilidade do serviço)')
+        return
+
     data = [_get_data(uid, cid, vector) for cid, vector in zip(conversation_ids, vectors)]
     res = index.upsert(vectors=data, namespace="ns1")
     logger.info(f'upsert_vectors {res}')
 
 
 def query_vectors(query: str, uid: str, starts_at: int = None, ends_at: int = None, k: int = 5) -> List[str]:
+    if conversations_karla.is_enabled():
+        return conversations_karla.buscar_conversas_ids(query, starts_at, ends_at, k)
+
     filter_data = {'uid': uid}
     if starts_at is not None:
         filter_data['created_at'] = {'$gte': starts_at, '$lte': ends_at}
@@ -75,6 +95,23 @@ def query_vectors_by_metadata(
     dates: List[str],
     limit: int = 5,
 ):
+    """
+    Com CONVERSAS_KARLA=true delega pra busca textual da Karla (mesmo helper de
+    query_vectors): junta people/topics/entities/dates num único texto de busca.
+    Ranking manual por contagem de matches de metadata (topics/entities/people)
+    cai fora — a Karla já devolve ids ordenados por relevância; paridade aceita.
+    """
+    if conversations_karla.is_enabled():
+        q = ' '.join([*people, *topics, *entities, *dates])
+        if not q.strip():
+            return []
+        start = None
+        end = None
+        if dates_filter and len(dates_filter) == 2 and dates_filter[0] and dates_filter[1]:
+            start = int(dates_filter[0].timestamp())
+            end = int(dates_filter[1].timestamp())
+        return conversations_karla.buscar_conversas_ids(q, start, end, limit)
+
     filter_data = {
         '$and': [
             {'uid': {'$eq': uid}},
@@ -139,7 +176,14 @@ def delete_vector(uid: str, conversation_id: str):
     Delete a conversation vector from Pinecone.
 
     Note: Vectors are stored with ID format '{uid}-{conversation_id}'
+
+    Com CONVERSAS_KARLA=true é no-op: delete de conversa na Karla remove a
+    linha inteira (dados + embedding juntos), não há vetor separado a apagar.
     """
+    if conversations_karla.is_enabled():
+        logger.debug('delete_vector no-op — CONVERSAS_KARLA on (delete remove a linha inteira na Karla)')
+        return
+
     vector_id = f'{uid}-{conversation_id}'
     result = index.delete(ids=[vector_id], namespace="ns1")
     logger.info(f'delete_vector {vector_id} {result}')
