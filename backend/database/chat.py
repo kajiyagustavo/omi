@@ -743,3 +743,48 @@ def delete_messages(uid: str, app_id: str = None, session_id: str = None) -> int
         batch.commit()
         deleted += len(docs)
     return deleted
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.2/F4.3 ────────────────────────────────────
+# Com OMI_DOCS_KARLA=true, chat (mensagens, arquivos, sessões) passa a morar no
+# doc-store genérico do memory-service (via database/chat_karla). Firestore fica
+# congelado como rollback (desligar a flag reverte tudo). Consumidores importam
+# `database.chat as chat_db`, então pegam a versão certa sem mudança nos routers.
+# Rebind explícito função a função. Migração de nível de cripto NÃO é rebindada
+# (sem sentido na Karla, que guarda texto claro).
+import os as _os
+
+if _os.getenv("OMI_DOCS_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import chat_karla as _chatk
+
+    add_message = _chatk.add_message
+    add_app_message = _chatk.add_app_message
+    add_integration_chat_message = _chatk.add_integration_chat_message
+    add_summary_message = _chatk.add_summary_message
+    get_app_messages = _chatk.get_app_messages
+    get_messages = _chatk.get_messages
+    get_message_count = _chatk.get_message_count
+    iter_all_messages = _chatk.iter_all_messages
+    get_message = _chatk.get_message
+    report_message = _chatk.report_message
+    update_message_rating = _chatk.update_message_rating
+    batch_delete_messages = _chatk.batch_delete_messages
+    clear_chat = _chatk.clear_chat
+    delete_messages = _chatk.delete_messages
+    add_multi_files = _chatk.add_multi_files
+    get_chat_files = _chatk.get_chat_files
+    get_chat_files_desc = _chatk.get_chat_files_desc
+    delete_multi_files = _chatk.delete_multi_files
+    add_chat_session = _chatk.add_chat_session
+    get_chat_session = _chatk.get_chat_session
+    get_chat_session_by_id = _chatk.get_chat_session_by_id
+    delete_chat_session = _chatk.delete_chat_session
+    add_message_to_chat_session = _chatk.add_message_to_chat_session
+    add_files_to_chat_session = _chatk.add_files_to_chat_session
+    update_chat_session_openai_ids = _chatk.update_chat_session_openai_ids
+    create_chat_session = _chatk.create_chat_session
+    acquire_chat_session = _chatk.acquire_chat_session
+    get_chat_sessions = _chatk.get_chat_sessions
+    update_chat_session = _chatk.update_chat_session
+    save_message = _chatk.save_message
+    logger.warning("chat: usando MEMÓRIA UNIFICADA (Karla) — OMI_DOCS_KARLA on")
