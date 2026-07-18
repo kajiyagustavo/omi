@@ -1,5 +1,6 @@
 from firebase_admin import auth
 
+from database import users_karla
 from database._client import db
 from database.redis_db import cache_user_name
 import logging
@@ -28,15 +29,24 @@ def get_user_from_uid(uid: str):
 
 
 def _get_firestore_user_name(uid: str):
-    """Fallback: get user name from Firestore user profile."""
+    """Fallback: get user name from the user profile.
+
+    Com CONFIG_KARLA on, lê `name` do doc `users` da MEMÓRIA UNIFICADA (Karla)
+    em vez do Firestore. Semântica idêntica (primeiro nome; default 'The User'
+    e o cache de nome ficam no chamador `get_user_name`)."""
     try:
-        user_doc = db.collection('users').document(uid).get()
-        if user_doc.exists:
+        if users_karla.is_enabled():
+            dados = users_karla.get_user_profile(uid) or {}
+            name = dados.get('name')
+        else:
+            user_doc = db.collection('users').document(uid).get()
+            if not user_doc.exists:
+                return None
             name = user_doc.to_dict().get('name')
-            if name and isinstance(name, str):
-                return name.split(' ')[0]
+        if name and isinstance(name, str):
+            return name.split(' ')[0]
     except Exception as e:
-        logger.error(f"Firestore user name lookup failed: {e}")
+        logger.error(f"User name lookup failed: {e}")
     return None
 
 
