@@ -404,3 +404,36 @@ async def _get_users_in_timezones(timezones: list[str], filter: str):
         users.extend(chunk_users)
 
     return users
+
+
+# ── MEMÓRIA UNIFICADA (Karla) — F4.5 ─────────────────────────────────────────
+# Com CONFIG_KARLA=true (mesma flag de database/users_karla.py), a config de
+# notificações (fcm_tokens, prefs de daily summary/mentor no doc `users`) passa
+# a morar no doc-store genérico do memory-service (via database/notifications_
+# karla). Firestore fica congelado como rollback (desligar a flag reverte
+# tudo). Consumidores importam `database.notifications as notification_db`,
+# então pegam a versão certa sem mudança nos routers/utils. Rebind explícito
+# função a função — todas as funções públicas deste módulo têm equivalente no
+# shim (nenhuma exclusão).
+import os as _os  # noqa: E402
+
+if _os.getenv("CONFIG_KARLA", "").lower() in ("1", "true", "yes"):
+    from database import notifications_karla as _notifk
+
+    save_token = _notifk.save_token
+    get_user_time_zone = _notifk.get_user_time_zone
+    get_daily_summary_hour_local = _notifk.get_daily_summary_hour_local
+    set_daily_summary_hour_local = _notifk.set_daily_summary_hour_local
+    get_daily_summary_enabled = _notifk.get_daily_summary_enabled
+    set_daily_summary_enabled = _notifk.set_daily_summary_enabled
+    get_mentor_notification_frequency = _notifk.get_mentor_notification_frequency
+    set_mentor_notification_frequency = _notifk.set_mentor_notification_frequency
+    get_all_tokens = _notifk.get_all_tokens
+    remove_invalid_token = _notifk.remove_invalid_token
+    remove_bulk_tokens = _notifk.remove_bulk_tokens
+    get_users_token_in_timezones = _notifk.get_users_token_in_timezones
+    get_users_id_in_timezones = _notifk.get_users_id_in_timezones
+    get_users_for_daily_summary = _notifk.get_users_for_daily_summary
+    _get_users_in_timezones = _notifk._get_users_in_timezones
+
+    logger.warning("notifications: usando MEMÓRIA UNIFICADA (Karla) — CONFIG_KARLA on")
