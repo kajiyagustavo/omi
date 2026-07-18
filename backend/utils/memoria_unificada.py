@@ -41,22 +41,31 @@ def buscar(query: str, limite_notas: int = 3, timeout: int = 30) -> dict | None:
         return None
 
 
-def atividades_do_dia(de_iso: str, ate_iso: str, timeout: int = 20) -> str | None:
-    """Bloco compacto com as notas registradas na memória unificada na janela
-    dada (sessões de trabalho com IA/ferramentas) — usado pelo jornal diário.
-    None em erro/vazio (o jornal segue só com as conversas de áudio)."""
+def notas_do_dia(de_iso: str, ate_iso: str, timeout: int = 20) -> list | None:
+    """Notas registradas na memória unificada na janela dada (lista crua
+    [{id, titulo, area, tipo, criado_em}]) — consumida pelo jornal do backend
+    e pela rota /v1/journal/atividades da web UI. None em erro (fallback do
+    chamador — nunca levanta)."""
     if not is_enabled():
         return None
     base = os.getenv("MEMORIA_UNIFICADA_URL", "").rstrip("/")
     token = os.getenv("MEMORIA_UNIFICADA_TOKEN", "")
     try:
         r = requests.get(f"{base}/u/{token}/notas-do-dia",
-                         params={"de": de_iso, "ate": ate_iso}, timeout=timeout)
+                         params={"de": de_iso, "ate": ate_iso, "limite": 500},
+                         timeout=timeout)
         r.raise_for_status()
-        notas = r.json().get("notas") or []
+        return r.json().get("notas") or []
     except Exception as e:
-        logger.warning(f"memoria_unificada.atividades_do_dia falhou: {e}")
+        logger.warning(f"memoria_unificada.notas_do_dia falhou: {e}")
         return None
+
+
+def atividades_do_dia(de_iso: str, ate_iso: str, timeout: int = 20) -> str | None:
+    """Bloco compacto com as notas registradas na memória unificada na janela
+    dada (sessões de trabalho com IA/ferramentas) — usado pelo jornal diário.
+    None em erro/vazio (o jornal segue só com as conversas de áudio)."""
+    notas = notas_do_dia(de_iso, ate_iso, timeout)
     if not notas:
         return None
     linhas = [f"- [{n.get('tipo','?')}/{n.get('area','?')}] {n.get('titulo','')}"
