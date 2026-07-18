@@ -78,7 +78,9 @@ def test_language_set_merge_patch():
         patch_call = rq.request.call_args_list[-1]
         assert patch_call[0][0] == "PATCH"
         assert patch_call[0][1].endswith("/u/tok-teste/omi-docs/users/uid-1")
-        assert patch_call[1]["json"]["dados_merge"] == {"language": "vi"}
+        # _merge_user sempre semeia `uid` no corpo (cron single-uid da Karla
+        # reconstrói identidade via dados['uid'] — ver notifications_karla)
+        assert patch_call[1]["json"]["dados_merge"] == {"language": "vi", "uid": "uid-1"}
 
 
 def test_language_get_default_vazio_quando_ausente():

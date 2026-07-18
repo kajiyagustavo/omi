@@ -103,7 +103,15 @@ def _get_user(uid: str) -> dict:
 
 def _merge_user(uid: str, updates: dict) -> None:
     """PATCH raso do doc `users` com chaves de TOPO (equivale a set(merge=True)
-    do Firestore quando as chaves são de topo). Cria o doc se não existir."""
+    do Firestore quando as chaves são de topo). Cria o doc se não existir.
+    Sempre semeia `uid` no corpo (idempotente, sem sobrescrever um valor
+    diferente já gravado — single-tenant, então é sempre igual ou ausente) pra
+    permitir reconstruir o uid depois de um `k.listar` sem doc_id — mesmo
+    idioma de `notifications_karla._merge_user` (ver docstring lá: cron de
+    daily summary depende de `uid` em `dados` pra não cair no fallback
+    `_SELF_HOST_DEFAULT_UID`)."""
+    updates = dict(updates)
+    updates.setdefault('uid', uid)
     if k.obter(_USERS, uid) is None:
         k.upsert(_USERS, uid, updates)
     else:
@@ -864,6 +872,7 @@ def delete_task_integration(uid: str, app_key: str) -> bool:
 
     if is_default:
         user_data.pop('default_task_integration', None)
+        user_data['uid'] = uid
         k.upsert(_USERS, uid, user_data)
 
     return True
