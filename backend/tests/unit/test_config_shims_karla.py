@@ -50,6 +50,8 @@ from database import users as users_mod  # noqa: E402
 from database import notifications as notif_mod  # noqa: E402
 from database import notifications_karla as nk  # noqa: E402
 from database import omi_docs_karla as odk  # noqa: E402
+from database import apps as apps_mod  # noqa: E402
+from database import apps_karla as ak  # noqa: E402
 from database.cache_manager import InMemoryCacheManager  # noqa: E402
 
 
@@ -439,3 +441,295 @@ def test_erro_de_rede_get_users_for_daily_summary_lista_vazia():
     with patch.object(odk, "requests", new=rq):
         result = asyncio.run(nk.get_users_for_daily_summary(["UTC"], 22))
         assert result == []
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ── apps_karla (shim PARCIAL) ────────────────────────────────────────────────
+# ═══════════════════════════════════════════════════════════════════════════
+
+
+def _app_doc(app_id, **overrides):
+    doc = {
+        'id': app_id,
+        'uid': 'uid-owner',
+        'private': False,
+        'approved': True,
+        'category': 'productivity',
+        'capabilities': ['chat'],
+    }
+    doc.update(overrides)
+    return doc
+
+
+# ── get_app_by_id_db: cache Redis primeiro, depois Karla, depois popula cache ──
+
+
+def test_get_app_by_id_usa_cache_primeiro():
+    with patch.object(ak, "get_app_cache_by_id", return_value=_app_doc("app-1")) as cache_get:
+        with patch.object(ak, "set_app_cache_by_id") as cache_set:
+            with patch.object(odk, "requests") as rq:
+                result = ak.get_app_by_id_db("app-1")
+                assert result == _app_doc("app-1")
+                cache_get.assert_called_once_with("app-1")
+                # cache hit — não vai na Karla nem popula o cache de novo.
+                assert rq.request.call_count == 0
+                cache_set.assert_not_called()
+
+
+def test_get_app_by_id_cache_miss_busca_karla_e_seta_cache():
+    with patch.object(ak, "get_app_cache_by_id", return_value=None):
+        with patch.object(ak, "set_app_cache_by_id") as cache_set:
+            with patch.object(odk, "requests") as rq:
+                rq.request.return_value = _resp({"dados": _app_doc("app-2")})
+                result = ak.get_app_by_id_db("app-2")
+                assert result == _app_doc("app-2")
+
+                get_call = rq.request.call_args_list[0]
+                assert get_call[0][0] == "GET"
+                assert get_call[0][1].endswith("/u/tok-teste/omi-docs/apps/app-2")
+
+                cache_set.assert_called_once_with("app-2", _app_doc("app-2"))
+
+
+def test_get_app_by_id_ausente_devolve_none_sem_setar_cache():
+    with patch.object(ak, "get_app_cache_by_id", return_value=None):
+        with patch.object(ak, "set_app_cache_by_id") as cache_set:
+            with patch.object(odk, "requests") as rq:
+                rq.request.return_value = _resp(None, status=404)
+                assert ak.get_app_by_id_db("missing") is None
+                cache_set.assert_not_called()
+
+
+def test_get_app_by_id_erro_de_rede_devolve_none_fail_open():
+    with patch.object(ak, "get_app_cache_by_id", return_value=None):
+        with patch.object(ak, "set_app_cache_by_id") as cache_set:
+            rq = _requests_mock()
+            rq.request.side_effect = RuntimeError("boom")
+            with patch.object(odk, "requests", new=rq):
+                assert ak.get_app_by_id_db("app-err") is None
+                cache_set.assert_not_called()
+
+
+# ── search_apps_db: filtra client-side (default approved+public) ──────────────
+
+
+def test_search_apps_default_filtra_approved_public():
+    apps = [
+        _app_doc("public-approved", private=False, approved=True),
+        _app_doc("public-unapproved", private=False, approved=False),
+        _app_doc("private-app", private=True, approved=True),
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.search_apps_db(uid="uid-owner")
+        assert [a['id'] for a in result] == ["public-approved"]
+
+        list_call = rq.request.call_args_list[0]
+        assert list_call[0][0] == "GET"
+        assert list_call[0][1].endswith("/u/tok-teste/omi-docs/apps")
+
+
+def test_search_apps_my_apps_filtra_por_uid_e_category():
+    apps = [
+        _app_doc("mine-productivity", uid="uid-owner", category="productivity"),
+        _app_doc("mine-other-cat", uid="uid-owner", category="social"),
+        _app_doc("not-mine", uid="someone-else", category="productivity"),
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.search_apps_db(uid="uid-owner", category="productivity", my_apps=True)
+        assert [a['id'] for a in result] == ["mine-productivity"]
+
+
+def test_search_apps_capability_filtra_array_contains():
+    apps = [
+        _app_doc("has-cap", capabilities=["chat", "memories"]),
+        _app_doc("no-cap", capabilities=["chat"]),
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.search_apps_db(uid="uid-owner", capability="memories")
+        assert [a['id'] for a in result] == ["has-cap"]
+
+
+def test_search_apps_installed_apps_sem_enabled_ids_lista_vazia():
+    with patch.object(odk, "requests") as rq:
+        result = ak.search_apps_db(uid="uid-owner", installed_apps=True, enabled_app_ids=[])
+        assert result == []
+        assert rq.request.call_count == 0
+
+
+def test_search_apps_installed_apps_filtra_por_ids():
+    apps = [
+        _app_doc("enabled-1"),
+        _app_doc("enabled-2"),
+        _app_doc("not-enabled"),
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.search_apps_db(uid="uid-owner", installed_apps=True, enabled_app_ids=["enabled-1", "enabled-2"])
+        assert {a['id'] for a in result} == {"enabled-1", "enabled-2"}
+
+
+# ── get_public_approved_apps_db / get_private_apps_db: filtro client-side ─────
+
+
+def test_get_public_approved_apps_filtra_approved_e_public():
+    apps = [
+        _app_doc("a1", approved=True, private=False),
+        _app_doc("a2", approved=True, private=True),
+        _app_doc("a3", approved=False, private=False),
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.get_public_approved_apps_db()
+        assert [a['id'] for a in result] == ["a1"]
+
+
+def test_get_private_apps_filtra_uid_e_private():
+    apps = [
+        _app_doc("p1", uid="uid-owner", private=True),
+        _app_doc("p2", uid="uid-owner", private=False),
+        _app_doc("p3", uid="someone-else", private=True),
+    ]
+    with patch.object(odk, "requests") as rq:
+        rq.request.return_value = _resp({"docs": [{"dados": a} for a in apps]})
+        result = ak.get_private_apps_db("uid-owner")
+        assert [a['id'] for a in result] == ["p1"]
+
+
+def test_listagens_erro_de_rede_devolvem_lista_vazia_fail_open():
+    rq = _requests_mock()
+    rq.request.side_effect = RuntimeError("boom")
+    with patch.object(odk, "requests", new=rq):
+        assert ak.get_public_approved_apps_db() == []
+        assert ak.get_private_apps_db("uid-owner") == []
+        assert ak.search_apps_db(uid="uid-owner") == []
+
+
+# ── CRUD: upsert/patch com id em dados + invalidação de cache ─────────────────
+
+
+def test_add_app_to_db_upsert_com_id_em_dados_e_invalida_cache():
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.return_value = _resp({"ok": True}, status=201)
+            ak.add_app_to_db(_app_doc("new-app"))
+
+            upsert_call = rq.request.call_args_list[0]
+            assert upsert_call[0][0] == "POST"
+            assert upsert_call[0][1].endswith("/u/tok-teste/omi-docs/apps")
+            body = upsert_call[1]["json"]
+            assert body["doc_id"] == "new-app"
+            assert body["dados"]["id"] == "new-app"
+
+            cache_del.assert_called_once_with("new-app")
+
+
+def test_update_app_in_db_patch_raso_e_invalida_cache():
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.return_value = _resp({"dados": {}})
+            ak.update_app_in_db({'id': 'app-1', 'name': 'Novo nome'})
+
+            patch_call = rq.request.call_args_list[0]
+            assert patch_call[0][0] == "PATCH"
+            assert patch_call[0][1].endswith("/u/tok-teste/omi-docs/apps/app-1")
+            body = patch_call[1]["json"]["dados_merge"]
+            assert body["name"] == "Novo nome"
+
+            cache_del.assert_called_once_with("app-1")
+
+
+def test_delete_app_from_db_deleta_e_invalida_cache():
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.return_value = _resp(None, status=204)
+            ak.delete_app_from_db("app-1")
+
+            delete_call = rq.request.call_args_list[0]
+            assert delete_call[0][0] == "DELETE"
+            assert delete_call[0][1].endswith("/u/tok-teste/omi-docs/apps/app-1")
+
+            cache_del.assert_called_once_with("app-1")
+
+
+def test_set_app_popular_db_patch_is_popular():
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.return_value = _resp({"dados": {}})
+            ak.set_app_popular_db("app-1", True)
+
+            patch_call = rq.request.call_args_list[0]
+            assert patch_call[0][0] == "PATCH"
+            assert patch_call[1]["json"]["dados_merge"] == {"is_popular": True}
+            cache_del.assert_called_once_with("app-1")
+
+
+def test_update_app_visibility_patch_simples_quando_nao_private_suffix():
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.return_value = _resp({"dados": {}})
+            ak.update_app_visibility_in_db("app-1", False)
+
+            patch_call = rq.request.call_args_list[0]
+            assert patch_call[0][0] == "PATCH"
+            assert patch_call[1]["json"]["dados_merge"] == {"private": False}
+            cache_del.assert_called_once_with("app-1")
+
+
+def test_update_app_visibility_recria_doc_quando_publica_app_privado():
+    app = _app_doc("base-private", private=True)
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.side_effect = [
+                _resp({"dados": app}),  # obter app-private
+                _resp(None, status=204),  # deletar app-private
+                _resp({"ok": True}, status=201),  # upsert novo id
+            ]
+            ak.update_app_visibility_in_db("base-private", False)
+
+            delete_call = rq.request.call_args_list[1]
+            assert delete_call[0][0] == "DELETE"
+            assert delete_call[0][1].endswith("/u/tok-teste/omi-docs/apps/base-private")
+
+            upsert_call = rq.request.call_args_list[2]
+            assert upsert_call[0][0] == "POST"
+            new_id = upsert_call[1]["json"]["doc_id"]
+            assert new_id.startswith("base-")
+            assert new_id != "base-private"
+            assert upsert_call[1]["json"]["dados"]["private"] is False
+            assert upsert_call[1]["json"]["dados"]["id"] == new_id
+
+            assert cache_del.call_count == 2
+            deleted_ids = {c.args[0] for c in cache_del.call_args_list}
+            assert deleted_ids == {"base-private", new_id}
+
+
+def test_update_app_visibility_noop_quando_doc_ausente():
+    with patch.object(ak, "delete_app_cache_by_id") as cache_del:
+        with patch.object(odk, "requests") as rq:
+            rq.request.return_value = _resp(None, status=404)
+            ak.update_app_visibility_in_db("gone-private", False)
+            # só o GET aconteceu — nem DELETE nem POST.
+            assert rq.request.call_count == 1
+            cache_del.assert_not_called()
+
+
+# ── footer rebind: só as funções shimadas são rebindadas ──────────────────────
+
+
+def test_apps_footer_rebind_parcial():
+    assert apps_mod.get_app_by_id_db is ak.get_app_by_id_db
+    assert apps_mod.get_public_approved_apps_db is ak.get_public_approved_apps_db
+    assert apps_mod.get_private_apps_db is ak.get_private_apps_db
+    assert apps_mod.search_apps_db is ak.search_apps_db
+    assert apps_mod.add_app_to_db is ak.add_app_to_db
+    assert apps_mod.update_app_in_db is ak.update_app_in_db
+    assert apps_mod.delete_app_from_db is ak.delete_app_from_db
+    assert apps_mod.update_app_visibility_in_db is ak.update_app_visibility_in_db
+    assert apps_mod.set_app_popular_db is ak.set_app_popular_db
+
+    # NÃO shimada — permanece Firestore, sem rebind pro módulo apps_karla.
+    assert apps_mod.set_app_review_in_db is not getattr(ak, "set_app_review_in_db", None)
+    assert not hasattr(ak, "set_app_review_in_db")
